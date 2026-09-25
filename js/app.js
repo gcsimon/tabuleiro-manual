@@ -1,14 +1,18 @@
-import { renderBoard, PTS } from './board.js';
+import { renderBoard, renderFigureIcon, PTS } from './board.js';
 
-// 0 = vazio, 1 = peça clara, 2 = peça escura
+// 0 = vazio, 1 = Batman, 2 = Homem-Aranha
 const EMPTY = 0;
 const STATES = 3;
 
-const container  = document.getElementById('board-container');
-const countLight = document.getElementById('count-light');
-const countDark  = document.getElementById('count-dark');
-const btnClear   = document.getElementById('btn-clear');
-const btnUndo    = document.getElementById('btn-undo');
+const container   = document.getElementById('board-container');
+const countBat    = document.getElementById('count-bat');
+const countSpider = document.getElementById('count-spider');
+const btnClear    = document.getElementById('btn-clear');
+const btnUndo     = document.getElementById('btn-undo');
+
+// Legend swatches are drawn by the same code that draws the pieces.
+document.getElementById('legend-icon-bat').appendChild(renderFigureIcon(1));
+document.getElementById('legend-icon-spider').appendChild(renderFigureIcon(2));
 
 let board   = PTS.map(() => EMPTY);
 let history = [];
@@ -46,8 +50,8 @@ function render(focusIdx = null) {
     onCycleBack: (i) => cycle(i, -1),
   }));
 
-  countLight.textContent = board.filter((v) => v === 1).length;
-  countDark.textContent  = board.filter((v) => v === 2).length;
+  countBat.textContent    = board.filter((v) => v === 1).length;
+  countSpider.textContent = board.filter((v) => v === 2).length;
   btnUndo.disabled = history.length === 0;
 
   // The SVG is rebuilt on every render, so keyboard focus has to be restored.

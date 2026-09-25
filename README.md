@@ -6,7 +6,7 @@ Não há turnos, não há jogadas válidas ou inválidas, não há vencedor. Cad
 tabuleiro simplesmente alterna entre três estados a cada clique:
 
 ```
-vazio  →  peça clara  →  peça escura  →  vazio
+vazio  →  Batman  →  Homem-Aranha  →  vazio
 ```
 
 É o equivalente digital de um tabuleiro físico com peças na mão: serve para montar
@@ -56,6 +56,14 @@ css/style.css     Estilos
 js/board.js       Geometria e desenho do tabuleiro em SVG
 js/app.js         Estado dos pontos, histórico e ligação com a interface
 ```
+
+### Trocar as figuras
+
+As duas figuras são SVG desenhado à mão em `js/board.js`: o array `FIGURES` define
+o nome e a cor de cada uma, e as funções `batIcon` e `spiderIcon` desenham os
+ícones (um morcego e uma aranha estilizados, arte própria — não são os logos
+oficiais das marcas). Para trocar por outras figuras, basta substituir essas
+funções e as cores.
 
 ### Trocar o tabuleiro
 
