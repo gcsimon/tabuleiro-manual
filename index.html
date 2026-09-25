@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tabuleiro Manual</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="wrapper">
+
+    <header class="board-header">
+      <span class="kicker">Modo livre</span>
+      <h1 class="main-title">Tabuleiro <span class="highlight">Manual</span></h1>
+      <p class="subtitle">Sem regras, sem turnos, sem vencedor. Clique nos pontos e monte a posição que quiser.</p>
+    </header>
+
+    <div class="board-area">
+      <div id="board-container" class="board-container"></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-dot empty"></span>
+        <span class="legend-text">Vazio</span>
+      </div>
+      <span class="legend-arrow">›</span>
+      <div class="legend-item">
+        <span class="legend-dot light"></span>
+        <span class="legend-text">Clara <b id="count-light">0</b></span>
+      </div>
+      <span class="legend-arrow">›</span>
+      <div class="legend-item">
+        <span class="legend-dot dark"></span>
+        <span class="legend-text">Escura <b id="count-dark">0</b></span>
+      </div>
+      <span class="legend-arrow">›</span>
+      <div class="legend-item">
+        <span class="legend-dot empty"></span>
+        <span class="legend-text">Vazio</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-secondary" id="btn-undo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 14 4 9 9 4"></polyline>
+          <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+        </svg>
+        Desfazer
+      </button>
+      <button class="btn-primary" id="btn-clear">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+        </svg>
+        Limpar tabuleiro
+      </button>
+    </div>
+
+    <p class="hint">
+      <strong>Clique</strong> avança a figura &nbsp;·&nbsp; <strong>Clique direito</strong> volta &nbsp;·&nbsp; <strong>Tab + Enter</strong> para usar pelo teclado
+    </p>
+
+    <footer class="board-footer">
+      <p>Tabuleiro livre — companheiro do projeto <em>21 Jogos Lógicos no Mesmo Tabuleiro</em></p>
+    </footer>
+
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
