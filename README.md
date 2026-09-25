@@ -62,7 +62,3 @@ js/app.js         Estado dos pontos, histórico e ligação com a interface
 A geometria fica toda em `js/board.js`: o array `PTS` define a posição de cada
 ponto e `BOARD_LINES` define as linhas desenhadas entre eles. Alterando esses dois
 valores o resto (cliques, contagem, desfazer) se ajusta sozinho.
-
----
-
-Projeto companheiro de [21 Jogos Lógicos no Mesmo Tabuleiro](../21_jogos_de_tabuleiro).

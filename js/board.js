@@ -4,7 +4,7 @@ const SIZE   = 300;
 const MARGIN = 45;
 const STEP   = (SIZE - 2 * MARGIN) / 2; // 105
 
-// The 9 points of the board (row-major), same geometry as the book's board.
+// The 9 points of the board, row-major.
 export const PTS = [];
 for (let r = 0; r < 3; r++) {
   for (let c = 0; c < 3; c++) {
