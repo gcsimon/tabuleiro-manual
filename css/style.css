@@ -144,8 +144,8 @@ body {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 14px 18px;
+  gap: 10px 26px;
+  padding: 14px 22px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -163,9 +163,6 @@ body {
 }
 .legend-dot svg { width: 17px; height: 17px; overflow: visible; }
 
-.legend-dot.empty {
-  border: 2px dashed var(--text3);
-}
 .legend-dot.bat {
   border: 1.5px solid var(--bat);
   color: var(--bat);
@@ -183,18 +180,6 @@ body {
 
 .legend-item.bat    .legend-text b { color: var(--bat); }
 .legend-item.spider .legend-text b { color: var(--spider); }
-
-.legend-arrow { color: var(--text3); font-size: 16px; }
-
-/* Closes the cycle: after Homem-Aranha the next click goes back to vazio. */
-.legend-loop {
-  color: var(--neon);
-  font-size: 17px;
-  line-height: 1;
-  margin-left: 2px;
-  opacity: 0.7;
-  cursor: help;
-}
 
 /* ============================================================
    ACTIONS
@@ -269,7 +254,6 @@ body {
 @media (max-width: 460px) {
   .wrapper { padding: 30px 16px 24px; gap: 20px; }
   .legend { gap: 8px; padding: 12px; }
-  .legend-arrow, .legend-loop { display: none; }
   .actions { width: 100%; }
   .btn-primary, .btn-secondary { flex: 1; justify-content: center; }
 }
