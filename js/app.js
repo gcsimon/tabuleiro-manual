@@ -1,69 +1,258 @@
-import { renderBoard, renderFigureIcon, PTS } from './board.js';
+import { renderBoard, renderFigureIcon, renderPiece, BUCKET_COLORS, FIGURES, PTS } from './board.js';
+import { startDrag } from './drag.js';
 
-// 0 = vazio, 1 = Batman, 2 = Homem-Aranha
-const EMPTY = 0;
-const STATES = 3;
+// 1 = Batman, 2 = Homem-Aranha
+const PLAYERS = [1, 2];
+const opponent = (fig) => 3 - fig;
 
 const container   = document.getElementById('board-container');
 const countBat    = document.getElementById('count-bat');
 const countSpider = document.getElementById('count-spider');
 const btnClear    = document.getElementById('btn-clear');
 const btnUndo     = document.getElementById('btn-undo');
+const btnNew      = document.getElementById('btn-new');
+const setup       = document.getElementById('setup');
+const setupForm   = document.getElementById('setup-form');
+const setupCancel = document.getElementById('setup-cancel');
+const bucketCols  = {
+  1: document.getElementById('buckets-bat'),
+  2: document.getElementById('buckets-spider'),
+};
 
 // Legend swatches are drawn by the same code that draws the pieces.
 document.getElementById('legend-icon-bat').appendChild(renderFigureIcon(1));
 document.getElementById('legend-icon-spider').appendChild(renderFigureIcon(2));
 
-let board   = PTS.map(() => EMPTY);
+let started = false;
+
+// One entry per point: null, or the piece standing on it:
+//   { fig, tone, home: { fig, bucket } }
+// `tone` picks its colour from BUCKET_COLORS[fig]; `home` is the bucket it was
+// taken from, so clearing can send it back there.
+let board = [];
+
+// Per player, one entry per bucket: { own, captured }.
+//   own:      how many of the player's own pieces are left
+//   captured: opponent pieces kept there as trophies, counted per tone
+let buckets = {};
+
 let history = [];
 
-function pushHistory() {
-  history.push(board.slice());
-  if (history.length > 100) history.shift();
+function newGame(bucketCount, perBucket) {
+  board   = PTS.map(() => null);
+  buckets = {};
+  for (const fig of PLAYERS) {
+    buckets[fig] = Array.from({ length: bucketCount }, () => ({
+      own: perBucket,
+      captured: BUCKET_COLORS[opponent(fig)].map(() => 0),
+    }));
+  }
+  history = [];
+  started = true;
+  render();
 }
 
-function cycle(idx, step) {
-  pushHistory();
-  board[idx] = (board[idx] + step + STATES) % STATES;
-  render(idx);
+function pushHistory() {
+  history.push(structuredClone({ board, buckets }));
+  if (history.length > 100) history.shift();
 }
 
 function undo() {
   if (!history.length) return;
-  board = history.pop();
+  ({ board, buckets } = history.pop());
   render();
+}
+
+/** Puts a piece into a bucket: as one of its own, or as a trophy. */
+function store(piece, fig, b) {
+  if (piece.fig === fig) buckets[fig][b].own++;
+  else buckets[fig][b].captured[piece.tone]++;
 }
 
 function clear() {
-  if (board.every((v) => v === EMPTY)) return;
+  if (board.every((p) => p === null)) return;
   pushHistory();
-  board = PTS.map(() => EMPTY);
+  for (const piece of board) {
+    if (piece) store(piece, piece.home.fig, piece.home.bucket);
+  }
+  board = PTS.map(() => null);
   render();
 }
 
-function render(focusIdx = null) {
-  // Read this before the rebuild: replacing the SVG drops the focused element.
-  const hadKeyboardFocus = document.activeElement?.classList.contains('point-hit');
+// ── Drag and drop ──────────────────────────────────────────────
 
+/** What a drag would land on, given the element under the pointer. */
+function dropTarget(el) {
+  const point = el?.closest('.point-hit');
+  if (point) return { type: 'point', idx: Number(point.dataset.idx), el: point };
+
+  const row = el?.closest('.bucket-row');
+  if (row) {
+    return {
+      type: 'bucket',
+      fig: Number(row.dataset.fig),
+      bucket: Number(row.dataset.bucket),
+      el: row.querySelector('.bucket'),
+    };
+  }
+  return null;
+}
+
+function canDrop(source, target) {
+  if (!target) return false;
+  if (target.type === 'point') return board[target.idx] === null;
+  // A piece on the board can go to any bucket: its own player's to give it
+  // back, the opponent's to capture it.
+  return source.from === 'point';
+}
+
+/** Removes the dragged piece from where it was. */
+function take(source) {
+  if (source.from === 'bucket') buckets[source.fig][source.bucket].own--;
+  else if (source.from === 'trophy') buckets[source.fig][source.bucket].captured[source.piece.tone]--;
+  else board[source.idx] = null;
+}
+
+function drop(source, target) {
+  const ok = canDrop(source, target);
+  if (ok) {
+    pushHistory();
+    take(source);
+    if (target.type === 'point') board[target.idx] = source.piece;
+    else store(source.piece, target.fig, target.bucket);
+  }
+
+  // Also runs on a refused drop, to put back the piece that was lifted.
+  render(ok && target.type === 'point' ? target.idx : null);
+}
+
+/**
+ * @param {object}       source - where the piece comes from, and the piece itself:
+ *   { from: 'bucket' | 'trophy', fig, bucket, piece } or { from: 'point', idx, piece }
+ * @param {PointerEvent} event
+ */
+function grab(source, event) {
+  if (event.button !== 0) return;
+
+  if (source.from === 'point') {
+    container.querySelector(`.piece[data-idx="${source.idx}"]`)?.classList.add('is-lifted');
+  }
+
+  let over = null;
+  startDrag(event, {
+    ghost: renderPiece(source.piece.fig, source.piece.tone),
+    onOver(el) {
+      over?.el.classList.remove('drop-ok');
+      over = dropTarget(el);
+      if (canDrop(source, over)) over.el.classList.add('drop-ok');
+    },
+    onDrop(el) {
+      drop(source, dropTarget(el));
+    },
+  });
+}
+
+// ── Rendering ──────────────────────────────────────────────────
+
+function badge(count) {
+  const el = document.createElement('span');
+  el.className = 'bucket-count';
+  el.textContent = count;
+  return el;
+}
+
+function setColor(el, fig, tone) {
+  const { color, ink } = BUCKET_COLORS[fig][tone];
+  el.style.setProperty('--c', color);
+  el.style.setProperty('--ink', ink);
+}
+
+function bucketEl(fig, b, { own }) {
+  const el = document.createElement('div');
+  el.className = 'bucket';
+  setColor(el, fig, b);
+  el.title = `Bucket ${BUCKET_COLORS[fig][b].name} do ${FIGURES[fig].name}: `
+           + `${own} ${own === 1 ? 'peça' : 'peças'}`;
+  if (own === 0) el.classList.add('is-empty');
+
+  // Only one piece is drawn; the badge says how many are left.
+  el.append(renderPiece(fig, b), badge(own));
+
+  if (own > 0) {
+    const piece = { fig, tone: b, home: { fig, bucket: b } };
+    el.addEventListener('pointerdown', (e) => grab({ from: 'bucket', fig, bucket: b, piece }, e));
+  }
+  return el;
+}
+
+/** One pile per colour of captured opponent pieces, so any of them can be picked. */
+function trophiesEl(fig, b, { captured }) {
+  const el = document.createElement('div');
+  el.className = 'trophies';
+  const other = opponent(fig);
+
+  captured.forEach((count, tone) => {
+    if (!count) return;
+
+    const pile = document.createElement('div');
+    pile.className = 'trophy';
+    setColor(pile, other, tone);
+    pile.title = `${count} ${count === 1 ? 'peça capturada' : 'peças capturadas'} `
+               + `do ${FIGURES[other].name} (${BUCKET_COLORS[other][tone].name})`;
+    pile.append(renderPiece(other, tone), badge(count));
+
+    const piece = { fig: other, tone, home: { fig, bucket: b } };
+    pile.addEventListener('pointerdown', (e) => grab({ from: 'trophy', fig, bucket: b, piece }, e));
+    el.appendChild(pile);
+  });
+  return el;
+}
+
+function bucketRow(fig, b, contents) {
+  const row = document.createElement('div');
+  row.className = 'bucket-row';
+  row.dataset.fig = fig;
+  row.dataset.bucket = b;
+  row.append(bucketEl(fig, b, contents), trophiesEl(fig, b, contents));
+  return row;
+}
+
+function render(animateIdx = null) {
   container.replaceChildren(renderBoard(board, {
-    onCycle:     (i) => cycle(i, +1),
-    onCycleBack: (i) => cycle(i, -1),
+    animateIdx,
+    onGrab: (idx, e) => grab({ from: 'point', idx, piece: board[idx] }, e),
   }));
 
-  countBat.textContent    = board.filter((v) => v === 1).length;
-  countSpider.textContent = board.filter((v) => v === 2).length;
-  btnUndo.disabled = history.length === 0;
-
-  // The SVG is rebuilt on every render, so keyboard focus has to be restored.
-  if (focusIdx !== null && hadKeyboardFocus) {
-    container.querySelectorAll('.point-hit')[focusIdx]?.focus();
+  for (const fig of PLAYERS) {
+    bucketCols[fig].replaceChildren(...buckets[fig].map((c, b) => bucketRow(fig, b, c)));
   }
+
+  countBat.textContent    = board.filter((p) => p?.fig === 1).length;
+  countSpider.textContent = board.filter((p) => p?.fig === 2).length;
+  btnUndo.disabled = history.length === 0;
 }
+
+// ── Setup ──────────────────────────────────────────────────────
+
+function openSetup() {
+  setupCancel.hidden = !started;
+  setup.showModal();
+}
+
+setupForm.addEventListener('submit', () => {
+  const data = new FormData(setupForm);
+  newGame(Number(data.get('buckets')), Number(data.get('pieces')));
+});
+
+setupCancel.addEventListener('click', () => setup.close());
+
+// Before the first game there is nothing to go back to.
+setup.addEventListener('cancel', (e) => {
+  if (!started) e.preventDefault();
+});
 
 btnClear.addEventListener('click', clear);
 btnUndo.addEventListener('click', undo);
+btnNew.addEventListener('click', openSetup);
 
-// Right-clicking the board area should never open the browser menu.
-container.addEventListener('contextmenu', (e) => e.preventDefault());
-
-render();
+openSetup();

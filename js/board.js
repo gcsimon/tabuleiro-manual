@@ -25,9 +25,26 @@ const HIT_R   = 36;
 // 0 = vazio, 1 = Batman, 2 = Homem-Aranha
 export const FIGURES = [
   { name: 'vazio' },
-  { name: 'Batman',       color: '#ffe14d', filter: 'tmGlowBat',    viewBox: '-20 -13 40 20' },
-  { name: 'Homem-Aranha', color: '#ff2e5b', filter: 'tmGlowSpider', viewBox: '-19 -12 38 27' },
+  { name: 'Batman',       color: '#ffe14d', viewBox: '-20 -13 40 20' },
+  { name: 'Homem-Aranha', color: '#ff2e5b', viewBox: '-19 -12 38 27' },
 ];
+
+// One colour per bucket; `ink` is the text colour that reads on top of it.
+// The number of colours caps how many buckets a player can have.
+export const BUCKET_COLORS = {
+  1: [
+    { name: 'amarelo',  color: '#ffe14d', ink: '#08090d' },
+    { name: 'roxo',     color: '#b46bff', ink: '#08090d' },
+    { name: 'azul',     color: '#3d7bff', ink: '#ffffff' },
+  ],
+  2: [
+    { name: 'vermelho', color: '#ff2e5b', ink: '#08090d' },
+    { name: 'verde',    color: '#4ade6b', ink: '#08090d' },
+    { name: 'laranja',  color: '#ff8a2b', ink: '#08090d' },
+  ],
+};
+
+const glowId = (color) => `tmGlow${color.slice(1)}`;
 
 function el(tag, attrs) {
   const e = document.createElementNS(NS, tag);
@@ -88,6 +105,19 @@ function figureIcon(value, color) {
   return value === 1 ? batIcon(color) : spiderIcon(color);
 }
 
+/** A round piece with its figure, drawn around (0,0). */
+function pieceShape(value, color) {
+  const g = el('g', { class: 'piece' });
+  g.appendChild(el('circle', {
+    cx: 0, cy: 0, r: PIECE_R,
+    fill: '#0b0d14',
+    stroke: color,
+    'stroke-width': '2',
+  }));
+  g.appendChild(figureIcon(value, color));
+  return g;
+}
+
 /**
  * Standalone SVG of one figure, for the legend swatches.
  *
@@ -102,22 +132,44 @@ export function renderFigureIcon(value) {
 }
 
 /**
- * Renders the board as an inline SVG element.
+ * Standalone SVG of a whole piece, for the buckets and the drag ghost.
  *
- * @param {number[]} state    - one value per point: 0 vazio, 1 Batman, 2 Homem-Aranha
- * @param {object}   handlers - { onCycle(idx), onCycleBack(idx) }
+ * @param {number} value  - 1 Batman, 2 Homem-Aranha
+ * @param {number} tone   - index into BUCKET_COLORS[value]
  * @returns {SVGSVGElement}
  */
-export function renderBoard(state, handlers = {}) {
-  const { onCycle = null, onCycleBack = null } = handlers;
+export function renderPiece(value, tone) {
+  const { color } = BUCKET_COLORS[value][tone];
+  const r = PIECE_R + 2;
+  const svg = el('svg', {
+    viewBox: `${-r} ${-r} ${2 * r} ${2 * r}`,
+    xmlns: NS,
+    class: 'piece-icon',
+    style: `--c: ${color}`,
+    'aria-hidden': 'true',
+  });
+  svg.appendChild(pieceShape(value, color));
+  return svg;
+}
+
+/**
+ * Renders the board as an inline SVG element.
+ *
+ * @param {Array}  state   - one entry per point: null, or the piece { fig, tone, home }
+ * @param {object} options - { onGrab(idx, event), animateIdx }
+ * @returns {SVGSVGElement}
+ */
+export function renderBoard(state, options = {}) {
+  const { onGrab = null, animateIdx = null } = options;
 
   const svg = el('svg', { viewBox: `0 0 ${SIZE} ${SIZE}`, class: 'board', xmlns: NS });
 
   // ── Defs ──────────────────────────────────────────────────────
   const defs = document.createElementNS(NS, 'defs');
   defs.appendChild(glowFilter('tmGlowLine',   '#2de2e6', '2.5'));
-  defs.appendChild(glowFilter('tmGlowBat',    FIGURES[1].color, '4'));
-  defs.appendChild(glowFilter('tmGlowSpider', FIGURES[2].color, '4'));
+  for (const colors of Object.values(BUCKET_COLORS)) {
+    for (const { color } of colors) defs.appendChild(glowFilter(glowId(color), color, '4'));
+  }
   svg.appendChild(defs);
 
   // ── Panel ─────────────────────────────────────────────────────
@@ -142,11 +194,11 @@ export function renderBoard(state, handlers = {}) {
 
   // ── Points and pieces ─────────────────────────────────────────
   PTS.forEach(([cx, cy], idx) => {
-    const value = state[idx];
-    const figure = FIGURES[value];
+    const piece = state[idx];
+    const figure = FIGURES[piece ? piece.fig : 0];
 
-    if (value === 0) {
-      // Empty point marker, so the clickable spots stay visible.
+    if (!piece) {
+      // Empty point marker, so the drop spots stay visible.
       svg.appendChild(el('circle', {
         cx, cy, r: 4.5,
         fill: '#2de2e6',
@@ -154,45 +206,28 @@ export function renderBoard(state, handlers = {}) {
         class: 'point-empty',
       }));
     } else {
-      const piece = el('g', { class: 'piece', filter: `url(#${figure.filter})` });
-      piece.appendChild(el('circle', {
-        cx, cy, r: PIECE_R,
-        fill: '#0b0d14',
-        stroke: figure.color,
-        'stroke-width': '2',
-      }));
-
-      const icon = figureIcon(value, figure.color);
-      icon.setAttribute('transform', `translate(${cx} ${cy})`);
-      piece.appendChild(icon);
-
-      svg.appendChild(piece);
+      // The translate lives on the outer group: the inner one is scaled by CSS.
+      const { color } = BUCKET_COLORS[piece.fig][piece.tone];
+      const holder = el('g', { transform: `translate(${cx} ${cy})`, filter: `url(#${glowId(color)})` });
+      const shape = pieceShape(piece.fig, color);
+      shape.dataset.idx = idx;
+      if (idx === animateIdx) shape.classList.add('is-new');
+      holder.appendChild(shape);
+      svg.appendChild(holder);
     }
 
-    // Transparent hit target on top, one per point.
+    // Transparent hit target on top, one per point. Also the drop target.
     const hit = el('circle', {
       cx, cy, r: HIT_R,
       fill: 'transparent',
-      class: 'point-hit',
-      tabindex: '0',
-      role: 'button',
+      class: !piece ? 'point-hit' : 'point-hit has-piece',
+      'data-idx': idx,
       'aria-label': `Ponto ${idx + 1}: ${figure.name}`,
     });
 
-    hit.addEventListener('click', () => onCycle && onCycle(idx));
-    hit.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      onCycleBack && onCycleBack(idx);
-    });
-    hit.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onCycle && onCycle(idx);
-      } else if (e.key === 'Backspace') {
-        e.preventDefault();
-        onCycleBack && onCycleBack(idx);
-      }
-    });
+    if (piece) {
+      hit.addEventListener('pointerdown', (e) => onGrab && onGrab(idx, e));
+    }
 
     svg.appendChild(hit);
   });
