@@ -373,7 +373,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
    ============================================================ */
 .setup {
   margin: auto;
-  width: min(340px, calc(100% - 32px));
+  width: min(560px, calc(100% - 32px));
   padding: 26px 24px 22px;
   background: var(--panel);
   color: var(--text);
@@ -392,6 +392,43 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   text-shadow: 0 0 12px var(--neon-glow);
   margin-bottom: 18px;
 }
+
+.setup-boards { border: none; margin-bottom: 18px; }
+.setup-boards legend { font-size: 14px; color: var(--text2); margin-bottom: 10px; }
+
+.board-choices {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.board-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px 7px;
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--text2);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.board-choice svg { width: 52px; height: 52px; color: var(--text3); transition: var(--transition); }
+.board-choice:hover { border-color: var(--border-hover); }
+.board-choice input { position: absolute; opacity: 0; pointer-events: none; }
+
+.board-choice:has(input:checked) {
+  color: var(--text);
+  border-color: var(--neon);
+  box-shadow: 0 0 12px var(--neon-glow);
+}
+.board-choice:has(input:checked) svg { color: var(--neon); }
+.board-choice:has(input:focus-visible) { outline: 2px solid var(--neon); outline-offset: 2px; }
 
 .setup-field {
   display: flex;
@@ -427,6 +464,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .actions { width: 100%; }
   .board-area { gap: 10px; }
   .bucket-col { gap: 26px; }
+  .board-choices { grid-template-columns: repeat(3, 1fr); }
   .bucket { width: 48px; height: 48px; }
   .bucket svg { width: 34px; height: 34px; }
   .bucket-count { min-width: 19px; height: 19px; font-size: 11px; }

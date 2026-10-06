@@ -8,6 +8,9 @@ e as peças são levadas para o tabuleiro arrastando.
 
 Ao iniciar, o jogo pergunta:
 
+- qual tabuleiro usar: 3×3 com diagonais, 3×3 simples, Grade 4×4, Shisima
+  (octógono), Alquerque 5×5, Fanorona 9×5, Jogo da Onça, Trilha pequena, Trilha,
+  Morabaraba, Resta Um (cruz), Hexágono, Triângulo ou Estrela;
 - quantos buckets cada jogador tem (1 a 3);
 - quantas peças vão em cada bucket (1 a 99).
 
@@ -35,6 +38,7 @@ O tabuleiro é desenhado como SVG inline.
 | Arrastar uma peça no tabuleiro | Move a peça para outro ponto vazio |
 | Arrastar uma peça para um bucket do mesmo jogador | Devolve a peça ao bucket |
 | Arrastar uma peça para um bucket do adversário | Captura a peça: ela fica como troféu ao lado desse bucket, numa pilha por cor |
+| Arrastar de um bucket direto para um bucket do adversário | Passa a peça sem usar o tabuleiro: vira troféu dele (ou, vindo de uma pilha de troféus, volta a ser peça normal do dono) |
 | Arrastar de uma pilha de troféus para um ponto vazio | Recoloca uma peça capturada daquela cor (ela continua sendo do adversário) |
 | Desfazer | Reverte a última alteração |
 | Limpar tabuleiro | Devolve cada peça ao bucket (ou à pilha de troféus) de onde saiu |
@@ -72,7 +76,8 @@ Depois acesse `http://localhost:8080`.
 ```
 index.html        Marcação da página
 css/style.css     Estilos
-js/board.js       Geometria e desenho do tabuleiro e das peças em SVG
+js/boards.js      Os tabuleiros disponíveis: pontos e linhas de cada um
+js/board.js       Desenho do tabuleiro e das peças em SVG
 js/drag.js        Arrastar e soltar com pointer events
 js/app.js         Estado do tabuleiro e dos buckets, histórico e ligação com a interface
 ```
@@ -85,8 +90,13 @@ o nome e a cor de cada uma, e as funções `batIcon` e `spiderIcon` desenham os
 oficiais das marcas). Para trocar por outras figuras, basta substituir essas
 funções e as cores.
 
-### Trocar o tabuleiro
+### Adicionar um tabuleiro
 
-A geometria fica toda em `js/board.js`: o array `PTS` define a posição de cada
-ponto e `BOARD_LINES` define as linhas desenhadas entre eles. Alterando esses dois
-valores o resto (arrastar, contagem, desfazer) se ajusta sozinho.
+Os tabuleiros ficam em `js/boards.js`, no array `LAYOUTS`. Cada um tem um `id`,
+um `name`, os `points` (posição de cada ponto num quadrado de 300×300) e as
+`lines` (cada linha é uma lista de índices de pontos, desenhada na ordem). Há
+funções que montam os formatos comuns: `cellBoard` para grades (inteiras ou
+recortadas, com ou sem as diagonais do Alquerque), `rings` para os quadrados
+concêntricos das trilhas, `wheel` para polígonos com centro, e `hexagon`,
+`triangle` e `star`. O tamanho das peças e da área de soltar se ajusta sozinho à distância
+entre os pontos, e o tabuleiro novo aparece na tela inicial automaticamente.

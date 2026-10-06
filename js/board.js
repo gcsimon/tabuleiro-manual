@@ -1,26 +1,8 @@
+import { SIZE } from './boards.js';
+
 const NS = 'http://www.w3.org/2000/svg';
 
-const SIZE   = 300;
-const MARGIN = 45;
-const STEP   = (SIZE - 2 * MARGIN) / 2; // 105
-
-// The 9 points of the board, row-major.
-export const PTS = [];
-for (let r = 0; r < 3; r++) {
-  for (let c = 0; c < 3; c++) {
-    PTS.push([MARGIN + c * STEP, MARGIN + r * STEP]);
-  }
-}
-
-// Each entry is a straight line drawn from the first to the last point.
-const BOARD_LINES = [
-  [0, 1, 2], [3, 4, 5], [6, 7, 8],
-  [0, 3, 6], [1, 4, 7], [2, 5, 8],
-  [0, 4, 8], [2, 4, 6],
-];
-
 const PIECE_R = 22;
-const HIT_R   = 36;
 
 // 0 = vazio, 1 = Batman, 2 = Homem-Aranha
 export const FIGURES = [
@@ -152,14 +134,44 @@ export function renderPiece(value, tone) {
   return svg;
 }
 
+/** The board's lines, one path per entry of `layout.lines`. */
+function boardLines(layout, attrs) {
+  const g = el('g', attrs);
+  for (const line of layout.lines) {
+    g.appendChild(el('polyline', {
+      points: line.map((i) => layout.points[i].join(',')).join(' '),
+      fill: 'none',
+    }));
+  }
+  return g;
+}
+
+/**
+ * Small picture of a board, for picking one in the setup dialog.
+ *
+ * @param {object} layout - an entry of BOARDS
+ * @returns {SVGSVGElement}
+ */
+export function renderBoardThumb(layout) {
+  const svg = el('svg', { viewBox: `0 0 ${SIZE} ${SIZE}`, xmlns: NS, 'aria-hidden': 'true' });
+  svg.appendChild(boardLines(layout, {
+    stroke: 'currentColor', 'stroke-width': '7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+  }));
+  for (const [cx, cy] of layout.points) {
+    svg.appendChild(el('circle', { cx, cy, r: 13 * layout.pieceScale, fill: 'currentColor' }));
+  }
+  return svg;
+}
+
 /**
  * Renders the board as an inline SVG element.
  *
+ * @param {object} layout  - an entry of BOARDS: its points and lines
  * @param {Array}  state   - one entry per point: null, or the piece { fig, tone, home }
  * @param {object} options - { onGrab(idx, event), animateIdx }
  * @returns {SVGSVGElement}
  */
-export function renderBoard(state, options = {}) {
+export function renderBoard(layout, state, options = {}) {
   const { onGrab = null, animateIdx = null } = options;
 
   const svg = el('svg', { viewBox: `0 0 ${SIZE} ${SIZE}`, class: 'board', xmlns: NS });
@@ -179,21 +191,14 @@ export function renderBoard(state, options = {}) {
   }));
 
   // ── Board lines ───────────────────────────────────────────────
-  const lines = el('g', { filter: 'url(#tmGlowLine)' });
-  for (const line of BOARD_LINES) {
-    const [a] = line;
-    const c = line[line.length - 1];
-    const [x1, y1] = PTS[a];
-    const [x2, y2] = PTS[c];
-    lines.appendChild(el('line', {
-      x1, y1, x2, y2,
-      stroke: '#2de2e6', 'stroke-width': '1.6', 'stroke-linecap': 'round', opacity: '0.75',
-    }));
-  }
-  svg.appendChild(lines);
+  svg.appendChild(boardLines(layout, {
+    filter: 'url(#tmGlowLine)',
+    stroke: '#2de2e6', 'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    opacity: '0.75',
+  }));
 
   // ── Points and pieces ─────────────────────────────────────────
-  PTS.forEach(([cx, cy], idx) => {
+  layout.points.forEach(([cx, cy], idx) => {
     const piece = state[idx];
     const figure = FIGURES[piece ? piece.fig : 0];
 
@@ -206,9 +211,12 @@ export function renderBoard(state, options = {}) {
         class: 'point-empty',
       }));
     } else {
-      // The translate lives on the outer group: the inner one is scaled by CSS.
+      // The placement lives on the outer group: the inner one is animated by CSS.
       const { color } = BUCKET_COLORS[piece.fig][piece.tone];
-      const holder = el('g', { transform: `translate(${cx} ${cy})`, filter: `url(#${glowId(color)})` });
+      const holder = el('g', {
+        transform: `translate(${cx} ${cy}) scale(${layout.pieceScale})`,
+        filter: `url(#${glowId(color)})`,
+      });
       const shape = pieceShape(piece.fig, color);
       shape.dataset.idx = idx;
       if (idx === animateIdx) shape.classList.add('is-new');
@@ -218,7 +226,7 @@ export function renderBoard(state, options = {}) {
 
     // Transparent hit target on top, one per point. Also the drop target.
     const hit = el('circle', {
-      cx, cy, r: HIT_R,
+      cx, cy, r: layout.hitR,
       fill: 'transparent',
       class: !piece ? 'point-hit' : 'point-hit has-piece',
       'data-idx': idx,

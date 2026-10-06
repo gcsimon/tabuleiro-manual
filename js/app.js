@@ -1,4 +1,5 @@
-import { renderBoard, renderFigureIcon, renderPiece, BUCKET_COLORS, FIGURES, PTS } from './board.js';
+import { renderBoard, renderBoardThumb, renderFigureIcon, renderPiece, BUCKET_COLORS, FIGURES } from './board.js';
+import { BOARDS, DEFAULT_BOARD } from './boards.js';
 import { startDrag } from './drag.js';
 
 // 1 = Batman, 2 = Homem-Aranha
@@ -25,6 +26,9 @@ document.getElementById('legend-icon-spider').appendChild(renderFigureIcon(2));
 
 let started = false;
 
+// The chosen board layout: its points and lines.
+let layout = BOARDS[DEFAULT_BOARD];
+
 // One entry per point: null, or the piece standing on it:
 //   { fig, tone, home: { fig, bucket } }
 // `tone` picks its colour from BUCKET_COLORS[fig]; `home` is the bucket it was
@@ -38,8 +42,13 @@ let buckets = {};
 
 let history = [];
 
-function newGame(bucketCount, perBucket) {
-  board   = PTS.map(() => null);
+function emptyBoard() {
+  return layout.points.map(() => null);
+}
+
+function newGame(boardId, bucketCount, perBucket) {
+  layout  = BOARDS[boardId];
+  board   = emptyBoard();
   buckets = {};
   for (const fig of PLAYERS) {
     buckets[fig] = Array.from({ length: bucketCount }, () => ({
@@ -75,7 +84,7 @@ function clear() {
   for (const piece of board) {
     if (piece) store(piece, piece.home.fig, piece.home.bucket);
   }
-  board = PTS.map(() => null);
+  board = emptyBoard();
   render();
 }
 
@@ -102,8 +111,9 @@ function canDrop(source, target) {
   if (!target) return false;
   if (target.type === 'point') return board[target.idx] === null;
   // A piece on the board can go to any bucket: its own player's to give it
-  // back, the opponent's to capture it.
-  return source.from === 'point';
+  // back, the opponent's to capture it. A piece taken from a bucket can go
+  // straight across to the other player's buckets.
+  return source.from === 'point' || target.fig !== source.fig;
 }
 
 /** Removes the dragged piece from where it was. */
@@ -218,7 +228,7 @@ function bucketRow(fig, b, contents) {
 }
 
 function render(animateIdx = null) {
-  container.replaceChildren(renderBoard(board, {
+  container.replaceChildren(renderBoard(layout, board, {
     animateIdx,
     onGrab: (idx, e) => grab({ from: 'point', idx, piece: board[idx] }, e),
   }));
@@ -234,6 +244,25 @@ function render(animateIdx = null) {
 
 // ── Setup ──────────────────────────────────────────────────────
 
+// One radio card per board, each with a small picture of it.
+const boardChoices = document.getElementById('board-choices');
+for (const { id, name } of Object.values(BOARDS)) {
+  const card = document.createElement('label');
+  card.className = 'board-choice';
+
+  const radio = document.createElement('input');
+  radio.type = 'radio';
+  radio.name = 'board';
+  radio.value = id;
+  radio.checked = id === DEFAULT_BOARD;
+
+  const caption = document.createElement('span');
+  caption.textContent = name;
+
+  card.append(radio, renderBoardThumb(BOARDS[id]), caption);
+  boardChoices.appendChild(card);
+}
+
 function openSetup() {
   setupCancel.hidden = !started;
   setup.showModal();
@@ -241,7 +270,7 @@ function openSetup() {
 
 setupForm.addEventListener('submit', () => {
   const data = new FormData(setupForm);
-  newGame(Number(data.get('buckets')), Number(data.get('pieces')));
+  newGame(data.get('board'), Number(data.get('buckets')), Number(data.get('pieces')));
 });
 
 setupCancel.addEventListener('click', () => setup.close());
