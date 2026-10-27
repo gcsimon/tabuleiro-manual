@@ -12,11 +12,16 @@ Ao iniciar, o jogo pergunta:
   (octógono), Alquerque 5×5, Fanorona 9×5, Jogo da Onça, Trilha pequena, Trilha,
   Morabaraba, Resta Um (cruz), Hexágono, Triângulo ou Estrela;
 - quantos buckets cada jogador tem (1 a 3);
-- quantas peças vão em cada bucket (1 a 99).
+- com quantas peças cada bucket começa (0 a 99 — um bucket vazio serve para
+  ir juntando peças durante o jogo);
+- a cor de cada bucket: vermelho, laranja, amarelo, verde, azul, roxo, rosa,
+  marrom ou branco. Cada cor só pode estar em um bucket, nem o mesmo jogador
+  nem o adversário a repetem; as que já estão em uso aparecem riscadas. Por
+  padrão o Batman fica com amarelo, roxo e azul e o Homem-Aranha com vermelho,
+  verde e laranja.
 
-Cada bucket tem uma cor (amarelo, roxo e azul para o Batman; vermelho, verde e
-laranja para o Homem-Aranha) e mostra uma peça e, no canto, quantas ainda restam
-nele. As peças levam a cor do bucket de onde saíram.
+Cada bucket mostra uma peça na sua cor e, no canto, quantas ainda restam nele.
+As peças levam a cor do bucket de onde saíram.
 
 É o equivalente digital de um tabuleiro físico com peças na mão: serve para montar
 posições, demonstrar situações em aula, estudar um problema ou só brincar.
@@ -42,19 +47,10 @@ O tabuleiro é desenhado como SVG inline.
 | Arrastar de uma pilha de troféus para um ponto vazio | Recoloca uma peça capturada daquela cor (ela continua sendo do adversário) |
 | Desfazer | Reverte a última alteração |
 | Limpar tabuleiro | Devolve cada peça ao bucket (ou à pilha de troféus) de onde saiu |
-| Novo jogo | Pergunta de novo buckets e peças e recomeça |
+| Novo jogo | Pergunta de novo tabuleiro, buckets, peças e cores e recomeça |
 
 Soltar em um lugar inválido (ponto ocupado, fora do tabuleiro) cancela o
 movimento. O arrasto usa pointer events, então funciona com mouse e com toque.
-
-------|--------|
-| Clique | Avança a figura do ponto |
-| Clique direito | Volta a figura do ponto |
-| Tab / Shift+Tab | Navega entre os pontos |
-| Enter ou Espaço | Avança a figura do ponto em foco |
-| Backspace | Volta a figura do ponto em foco |
-| Desfazer | Reverte a última alteração |
-| Limpar tabuleiro | Esvazia todos os pontos |
 
 ---
 
@@ -89,6 +85,11 @@ o nome e a cor de cada uma, e as funções `batIcon` e `spiderIcon` desenham os
 ícones (um morcego e uma aranha estilizados, arte própria — não são os logos
 oficiais das marcas). Para trocar por outras figuras, basta substituir essas
 funções e as cores.
+
+As cores que um bucket pode ter ficam no array `PALETTE`, no mesmo arquivo;
+uma cor nova ali aparece sozinha na escolha de cores do início do jogo. Elas
+foram ajustadas para nenhuma se confundir com outra nem com o ciano das linhas
+do tabuleiro, então uma cor nova precisa ficar bem longe de todas elas.
 
 ### Adicionar um tabuleiro
 

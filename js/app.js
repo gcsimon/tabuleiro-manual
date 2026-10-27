@@ -1,4 +1,4 @@
-import { renderBoard, renderBoardThumb, renderFigureIcon, renderPiece, BUCKET_COLORS, FIGURES } from './board.js';
+import { renderBoard, renderBoardThumb, renderFigureIcon, renderPiece, FIGURES, PALETTE } from './board.js';
 import { BOARDS, DEFAULT_BOARD } from './boards.js';
 import { startDrag } from './drag.js';
 
@@ -31,11 +31,12 @@ let layout = BOARDS[DEFAULT_BOARD];
 
 // One entry per point: null, or the piece standing on it:
 //   { fig, tone, home: { fig, bucket } }
-// `tone` picks its colour from BUCKET_COLORS[fig]; `home` is the bucket it was
+// `tone` is its colour, an index into PALETTE; `home` is the bucket it was
 // taken from, so clearing can send it back there.
 let board = [];
 
-// Per player, one entry per bucket: { own, captured }.
+// Per player, one entry per bucket: { tone, own, captured }.
+//   tone:     the bucket's colour, an index into PALETTE
 //   own:      how many of the player's own pieces are left
 //   captured: opponent pieces kept there as trophies, counted per tone
 let buckets = {};
@@ -46,14 +47,19 @@ function emptyBoard() {
   return layout.points.map(() => null);
 }
 
-function newGame(boardId, bucketCount, perBucket) {
+/**
+ * @param {string} boardId - key of BOARDS
+ * @param {object} setups  - per player, one { tone, own } per bucket
+ */
+function newGame(boardId, setups) {
   layout  = BOARDS[boardId];
   board   = emptyBoard();
   buckets = {};
   for (const fig of PLAYERS) {
-    buckets[fig] = Array.from({ length: bucketCount }, () => ({
-      own: perBucket,
-      captured: BUCKET_COLORS[opponent(fig)].map(() => 0),
+    buckets[fig] = setups[fig].map(({ tone, own }) => ({
+      tone,
+      own,
+      captured: PALETTE.map(() => 0),
     }));
   }
   history = [];
@@ -171,25 +177,25 @@ function badge(count) {
   return el;
 }
 
-function setColor(el, fig, tone) {
-  const { color, ink } = BUCKET_COLORS[fig][tone];
+function setColor(el, tone) {
+  const { color, ink } = PALETTE[tone];
   el.style.setProperty('--c', color);
   el.style.setProperty('--ink', ink);
 }
 
-function bucketEl(fig, b, { own }) {
+function bucketEl(fig, b, { tone, own }) {
   const el = document.createElement('div');
   el.className = 'bucket';
-  setColor(el, fig, b);
-  el.title = `Bucket ${BUCKET_COLORS[fig][b].name} do ${FIGURES[fig].name}: `
+  setColor(el, tone);
+  el.title = `Bucket ${PALETTE[tone].name} do ${FIGURES[fig].name}: `
            + `${own} ${own === 1 ? 'peça' : 'peças'}`;
   if (own === 0) el.classList.add('is-empty');
 
   // Only one piece is drawn; the badge says how many are left.
-  el.append(renderPiece(fig, b), badge(own));
+  el.append(renderPiece(fig, tone), badge(own));
 
   if (own > 0) {
-    const piece = { fig, tone: b, home: { fig, bucket: b } };
+    const piece = { fig, tone, home: { fig, bucket: b } };
     el.addEventListener('pointerdown', (e) => grab({ from: 'bucket', fig, bucket: b, piece }, e));
   }
   return el;
@@ -206,9 +212,9 @@ function trophiesEl(fig, b, { captured }) {
 
     const pile = document.createElement('div');
     pile.className = 'trophy';
-    setColor(pile, other, tone);
+    setColor(pile, tone);
     pile.title = `${count} ${count === 1 ? 'peça capturada' : 'peças capturadas'} `
-               + `do ${FIGURES[other].name} (${BUCKET_COLORS[other][tone].name})`;
+               + `do ${FIGURES[other].name} (${PALETTE[tone].name})`;
     pile.append(renderPiece(other, tone), badge(count));
 
     const piece = { fig: other, tone, home: { fig, bucket: b } };
@@ -244,6 +250,13 @@ function render(animateIdx = null) {
 
 // ── Setup ──────────────────────────────────────────────────────
 
+const MAX_BUCKETS    = 3;
+const DEFAULT_PIECES = 3;
+const DEFAULT_COLORS = {
+  1: ['amarelo', 'roxo', 'azul'],
+  2: ['vermelho', 'verde', 'laranja'],
+};
+
 // One radio card per board, each with a small picture of it.
 const boardChoices = document.getElementById('board-choices');
 for (const { id, name } of Object.values(BOARDS)) {
@@ -263,6 +276,129 @@ for (const { id, name } of Object.values(BOARDS)) {
   boardChoices.appendChild(card);
 }
 
+/** A colour to pick for a bucket: a radio button drawn as a round swatch. */
+function swatch(name, tone, checked) {
+  const { name: colorName, color } = PALETTE[tone];
+  const label = document.createElement('label');
+  label.className = 'swatch';
+  label.title = colorName;
+  label.style.setProperty('--c', color);
+
+  const radio = document.createElement('input');
+  radio.type = 'radio';
+  radio.name = name;
+  radio.value = tone;
+  radio.checked = checked;
+  radio.setAttribute('aria-label', colorName);
+
+  label.appendChild(radio);
+  return label;
+}
+
+// No two buckets on show share a colour, whether of the same player or not.
+const bucketRows = [];
+
+const toneOf = (row) => Number(row.querySelector('.swatch input:checked').value);
+
+/** The colours used by the buckets on show, apart from `row`. */
+function takenTones(row) {
+  return new Set(bucketRows.filter((r) => r !== row && !r.hidden).map(toneOf));
+}
+
+/** Rules out, in every bucket, the colours the other buckets are using. */
+function syncSwatches() {
+  for (const row of bucketRows) {
+    const taken = takenTones(row);
+    for (const radio of row.querySelectorAll('.swatch input')) {
+      const tone = Number(radio.value);
+      radio.disabled = taken.has(tone);
+      radio.parentElement.title = PALETTE[tone].name + (radio.disabled ? ' (já usada)' : '');
+    }
+  }
+}
+
+/** One row per bucket: how many pieces it starts with, and its colour. */
+function bucketSetup(fig, b) {
+  const row = document.createElement('fieldset');
+  row.className = 'bucket-setup';
+  bucketRows.push(row);
+  const what = `bucket ${b + 1} do ${FIGURES[fig].name}`;
+
+  const tone = PALETTE.findIndex((c) => c.name === DEFAULT_COLORS[fig][b]);
+  const preview = document.createElement('span');
+  preview.className = 'bucket-preview';
+  preview.appendChild(renderPiece(fig, tone));
+
+  const pieces = document.createElement('input');
+  pieces.type = 'number';
+  pieces.name = `pieces-${fig}-${b}`;
+  pieces.min = 0;
+  pieces.max = 99;
+  pieces.value = DEFAULT_PIECES;
+  pieces.required = true;
+  pieces.setAttribute('aria-label', `Peças no ${what}`);
+
+  const swatches = document.createElement('div');
+  swatches.className = 'swatches';
+  swatches.setAttribute('role', 'radiogroup');
+  swatches.setAttribute('aria-label', `Cor do ${what}`);
+  PALETTE.forEach((_, t) => swatches.appendChild(swatch(`color-${fig}-${b}`, t, t === tone)));
+
+  // The preview shows the piece in the colour picked.
+  swatches.addEventListener('change', (e) => {
+    preview.replaceChildren(renderPiece(fig, Number(e.target.value)));
+    syncSwatches();
+  });
+
+  row.append(preview, pieces, swatches);
+  return row;
+}
+
+/** Per player: how many buckets, then the pieces and colour of each. */
+function playerSetup(fig) {
+  const block = document.createElement('fieldset');
+  block.className = 'setup-player';
+
+  const legend = document.createElement('legend');
+  legend.append(renderFigureIcon(fig), FIGURES[fig].name);
+
+  const field = document.createElement('label');
+  field.className = 'setup-field';
+  const caption = document.createElement('span');
+  caption.textContent = 'Buckets';
+  const count = document.createElement('select');
+  count.name = `buckets-${fig}`;
+  for (let n = 1; n <= MAX_BUCKETS; n++) {
+    count.add(new Option(n, n, n === MAX_BUCKETS, n === MAX_BUCKETS));
+  }
+  field.append(caption, count);
+
+  // Rows past the chosen count are hidden, and disabled so they skip validation.
+  const rows = Array.from({ length: MAX_BUCKETS }, (_, b) => bucketSetup(fig, b));
+  const showRows = () => {
+    for (const [b, row] of rows.entries()) {
+      row.hidden = row.disabled = b >= Number(count.value);
+
+      // A bucket coming back may find its colour taken meanwhile: it moves to a free one.
+      const taken = takenTones(row);
+      if (!row.hidden && taken.has(toneOf(row))) {
+        const free = PALETTE.findIndex((_, t) => !taken.has(t));
+        const radio = row.querySelector(`.swatch input[value="${free}"]`);
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    syncSwatches();
+  };
+  count.addEventListener('change', showRows);
+  showRows();
+
+  block.append(legend, field, ...rows);
+  return block;
+}
+
+document.getElementById('player-setups').append(...PLAYERS.map(playerSetup));
+
 function openSetup() {
   setupCancel.hidden = !started;
   setup.showModal();
@@ -270,7 +406,14 @@ function openSetup() {
 
 setupForm.addEventListener('submit', () => {
   const data = new FormData(setupForm);
-  newGame(data.get('board'), Number(data.get('buckets')), Number(data.get('pieces')));
+  const setups = {};
+  for (const fig of PLAYERS) {
+    setups[fig] = Array.from({ length: Number(data.get(`buckets-${fig}`)) }, (_, b) => ({
+      tone: Number(data.get(`color-${fig}-${b}`)),
+      own:  Number(data.get(`pieces-${fig}-${b}`)),
+    }));
+  }
+  newGame(data.get('board'), setups);
 });
 
 setupCancel.addEventListener('click', () => setup.close());

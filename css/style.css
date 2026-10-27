@@ -373,7 +373,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
    ============================================================ */
 .setup {
   margin: auto;
-  width: min(560px, calc(100% - 32px));
+  width: min(760px, calc(100% - 32px));
+  color-scheme: dark;
   padding: 26px 24px 22px;
   background: var(--panel);
   color: var(--text);
@@ -398,7 +399,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 
 .board-choices {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 8px;
 }
 
@@ -439,7 +440,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   font-size: 14px;
   color: var(--text2);
 }
-.setup-field input {
+.setup-field select,
+.bucket-setup input[type="number"] {
   width: 72px;
   padding: 8px 10px;
   font: inherit;
@@ -449,7 +451,82 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
 }
-.setup-field input:focus { outline: none; border-color: var(--neon); box-shadow: 0 0 10px var(--neon-glow); }
+.setup-field select:focus,
+.bucket-setup input[type="number"]:focus { outline: none; border-color: var(--neon); box-shadow: 0 0 10px var(--neon-glow); }
+
+/* One block per player, side by side when there is room. */
+.player-setups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 18px 28px;
+}
+
+.setup-player { border: none; min-width: 0; }
+.setup-player legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: var(--text2);
+}
+.setup-player legend svg { width: 20px; height: 20px; overflow: visible; }
+.setup-player .setup-field { margin-bottom: 4px; }
+
+/* Each bucket: a preview of its piece, how many it starts with, its colour. */
+.bucket-setup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  border: none;
+  min-width: 0;
+}
+/* Its own display would otherwise win over [hidden]. */
+.bucket-setup[hidden] { display: none; }
+
+.bucket-preview { flex-shrink: 0; width: 32px; height: 32px; }
+.bucket-preview svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+.bucket-setup input[type="number"] { width: 60px; flex-shrink: 0; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.swatch {
+  position: relative;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--c);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.swatch:hover { transform: scale(1.15); }
+.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+
+/* The chosen colour gets a ring, set off from the swatch by a dark gap. */
+.swatch:has(input:checked) {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--c),
+              0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.swatch:has(input:focus-visible) { outline: 2px solid var(--neon); outline-offset: 5px; }
+
+/* A colour another bucket is using: hollow and struck through. */
+.swatch:has(input:disabled) {
+  opacity: 0.5;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--c);
+  cursor: not-allowed;
+  transform: none;
+}
+.swatch:has(input:disabled)::after {
+  content: '';
+  position: absolute;
+  left: -1px; right: -1px; top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--c);
+  transform: rotate(-45deg);
+}
 
 .setup-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 /* The buttons' own display would otherwise win over [hidden]. */
@@ -464,7 +541,6 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .actions { width: 100%; }
   .board-area { gap: 10px; }
   .bucket-col { gap: 26px; }
-  .board-choices { grid-template-columns: repeat(3, 1fr); }
   .bucket { width: 48px; height: 48px; }
   .bucket svg { width: 34px; height: 34px; }
   .bucket-count { min-width: 19px; height: 19px; font-size: 11px; }

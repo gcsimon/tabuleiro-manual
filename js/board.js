@@ -11,20 +11,21 @@ export const FIGURES = [
   { name: 'Homem-Aranha', color: '#ff2e5b', viewBox: '-19 -12 38 27' },
 ];
 
-// One colour per bucket; `ink` is the text colour that reads on top of it.
-// The number of colours caps how many buckets a player can have.
-export const BUCKET_COLORS = {
-  1: [
-    { name: 'amarelo',  color: '#ffe14d', ink: '#08090d' },
-    { name: 'roxo',     color: '#b46bff', ink: '#08090d' },
-    { name: 'azul',     color: '#3d7bff', ink: '#ffffff' },
-  ],
-  2: [
-    { name: 'vermelho', color: '#ff2e5b', ink: '#08090d' },
-    { name: 'verde',    color: '#4ade6b', ink: '#08090d' },
-    { name: 'laranja',  color: '#ff8a2b', ink: '#08090d' },
-  ],
-};
+// The colours a bucket can be given; `ink` is the text colour that reads on
+// top of it. Buckets and pieces keep their colour as an index into this list.
+// Tuned so that no two are easily confused (CIEDE2000 ≥ 24 between any pair,
+// and from the cyan board lines) and each stands out on the dark piece.
+export const PALETTE = [
+  { name: 'vermelho', color: '#ff2e4d', ink: '#08090d' },
+  { name: 'laranja',  color: '#ff8a2b', ink: '#08090d' },
+  { name: 'amarelo',  color: '#ffe14d', ink: '#08090d' },
+  { name: 'verde',    color: '#4ade6b', ink: '#08090d' },
+  { name: 'azul',     color: '#4193fc', ink: '#08090d' },
+  { name: 'roxo',     color: '#823ff5', ink: '#ffffff' },
+  { name: 'rosa',     color: '#f780c6', ink: '#08090d' },
+  { name: 'marrom',   color: '#965425', ink: '#ffffff' },
+  { name: 'branco',   color: '#f1f5f9', ink: '#08090d' },
+];
 
 const glowId = (color) => `tmGlow${color.slice(1)}`;
 
@@ -117,11 +118,11 @@ export function renderFigureIcon(value) {
  * Standalone SVG of a whole piece, for the buckets and the drag ghost.
  *
  * @param {number} value  - 1 Batman, 2 Homem-Aranha
- * @param {number} tone   - index into BUCKET_COLORS[value]
+ * @param {number} tone   - index into PALETTE
  * @returns {SVGSVGElement}
  */
 export function renderPiece(value, tone) {
-  const { color } = BUCKET_COLORS[value][tone];
+  const { color } = PALETTE[tone];
   const r = PIECE_R + 2;
   const svg = el('svg', {
     viewBox: `${-r} ${-r} ${2 * r} ${2 * r}`,
@@ -179,9 +180,7 @@ export function renderBoard(layout, state, options = {}) {
   // ── Defs ──────────────────────────────────────────────────────
   const defs = document.createElementNS(NS, 'defs');
   defs.appendChild(glowFilter('tmGlowLine',   '#2de2e6', '2.5'));
-  for (const colors of Object.values(BUCKET_COLORS)) {
-    for (const { color } of colors) defs.appendChild(glowFilter(glowId(color), color, '4'));
-  }
+  for (const { color } of PALETTE) defs.appendChild(glowFilter(glowId(color), color, '4'));
   svg.appendChild(defs);
 
   // ── Panel ─────────────────────────────────────────────────────
@@ -212,7 +211,7 @@ export function renderBoard(layout, state, options = {}) {
       }));
     } else {
       // The placement lives on the outer group: the inner one is animated by CSS.
-      const { color } = BUCKET_COLORS[piece.fig][piece.tone];
+      const { color } = PALETTE[piece.tone];
       const holder = el('g', {
         transform: `translate(${cx} ${cy}) scale(${layout.pieceScale})`,
         filter: `url(#${glowId(color)})`,
