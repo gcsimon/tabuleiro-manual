@@ -68,10 +68,16 @@ O projeto usa ES modules, então precisa ser servido por HTTP (abrir o `index.ht
 direto pelo sistema de arquivos não funciona).
 
 ```bash
-python -m http.server 8080
+python serve.py
 ```
 
-Depois acesse `http://localhost:8080`.
+Depois acesse `http://localhost:8080`. O servidor também mostra o endereço para
+abrir no celular, na mesma rede Wi-Fi.
+
+O `serve.py` manda o navegador não guardar nenhum arquivo em cache, então uma
+alteração aparece só recarregando a página, sem limpar o cache. Com
+`python -m http.server` o navegador guarda os arquivos por um tempo e pode
+continuar mostrando a versão antiga.
 
 ---
 
@@ -79,6 +85,7 @@ Depois acesse `http://localhost:8080`.
 
 ```
 index.html        Marcação da página
+serve.py          Servidor local sem cache, para testar
 css/style.css     Estilos
 js/boards.js      Os tabuleiros disponíveis: pontos, linhas e curvas de cada um
 js/board.js       Desenho do tabuleiro e das peças em SVG
