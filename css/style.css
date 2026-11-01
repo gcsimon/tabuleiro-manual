@@ -129,7 +129,8 @@ body {
   to   { opacity: 1; transform: scale(1); }
 }
 
-.point-hit { outline: none; touch-action: none; }
+/* No touch-action here: it is ignored on SVG shapes, board.js stops the scroll instead. */
+.point-hit { outline: none; }
 .point-hit.has-piece { cursor: grab; }
 
 /* The hit target sits above the mark, so the hover ring is drawn on it. */

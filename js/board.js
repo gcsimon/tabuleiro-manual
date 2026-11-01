@@ -248,6 +248,9 @@ export function renderBoard(layout, state, options = {}) {
 
     if (piece) {
       hit.addEventListener('pointerdown', (e) => onGrab && onGrab(idx, e));
+      // A touch on a piece must not scroll the page: the scroll would cancel the drag.
+      // CSS touch-action can't do this here, browsers ignore it on SVG shapes.
+      hit.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     }
 
     svg.appendChild(hit);
