@@ -594,8 +594,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
   }
 
   /* Sizes of buckets and piles, and the gaps around them; smaller on the
-     narrowest phones, further down. */
-  .board-area { --bucket: 48px; --pile: 22px; --pile-gap: 7px; --tray-gap: 8px; --slot-gap: 10px; }
+     narrowest phones, further down. --slot is the width each bucket gets. */
+  .board-area {
+    --bucket: 48px; --pile: 22px; --slot: 100px;
+    --pile-gap: 7px; --tray-gap: 12px; --slot-gap: 10px;
+  }
 
   .bucket-col {
     flex-direction: row;
@@ -607,32 +610,31 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
   .bucket svg { width: 34px; height: 34px; }
   .bucket-count { min-width: 19px; height: 19px; font-size: 11px; }
 
-  /* The piles go right of the bucket for both players, in two rows as tall
-     as the bucket. Room for two columns is kept even when empty, so the two
-     players' buckets line up; a fifth pile opens a third column. */
-  #buckets-bat .bucket-row { flex-direction: row; }
-  .bucket-row { gap: var(--tray-gap); }
+  /* Each bucket sits centred in a slot of the same width for everyone, so
+     the buckets are centred on screen and the two players' rows line up.
+     Its piles go below it, centred too, three to a row. */
+  #buckets-bat .bucket-row { flex-direction: column; }
+  .bucket-row { flex-direction: column; width: var(--slot); gap: var(--tray-gap); }
   .piles {
     width: auto;
-    min-width: calc(2 * var(--pile) + var(--pile-gap));
-    display: grid;
-    grid-template-rows: repeat(2, var(--pile));
-    grid-auto-flow: column;
-    grid-auto-columns: var(--pile);
-    grid-gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
-    gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
+    max-width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px var(--pile-gap);
   }
+  .piles:empty { display: none; }
   .pile { width: var(--pile); height: var(--pile); }
   .pile svg { width: 15px; height: 15px; }
   .btn-primary, .btn-secondary { flex: 1; justify-content: center; }
 }
 
-/* The narrowest phones (down to 320px): three buckets with their piles still
-   fit in a row. */
+/* The narrowest phones (down to 320px): three buckets still fit in a row. */
 @media (max-width: 374px) {
-  .board-area { --bucket: 42px; --pile: 18px; --pile-gap: 6px; --tray-gap: 7px; --slot-gap: 7px; }
+  .board-area { --bucket: 42px; --pile: 18px; --slot: 84px; --pile-gap: 6px; --tray-gap: 11px; --slot-gap: 6px; }
   .bucket svg { width: 30px; height: 30px; }
   .pile svg { width: 13px; height: 13px; }
+  .pile .bucket-count { right: -6px; bottom: -4px; min-width: 12px; height: 12px; padding: 0 3px; font-size: 8.5px; }
 }
 
 /* ============================================================
@@ -683,13 +685,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
   .no-flex-gap .bucket-col             { margin: calc(var(--slot-gap) / -2); }
   .no-flex-gap .bucket-col > *         { margin: calc(var(--slot-gap) / 2); }
   .no-flex-gap #buckets-spider .piles,
-  .no-flex-gap #buckets-bat .piles     { margin: 0 0 0 var(--tray-gap); }
-  /* The piles are a grid here, and grids have gap on these browsers too. */
-  .no-flex-gap .piles {
-    grid-gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
-    gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
+  .no-flex-gap #buckets-bat .piles {
+    margin: calc(var(--tray-gap) - 3px) calc(var(--pile-gap) / -2) -3px;
   }
-  .no-flex-gap .piles > * + *          { margin-top: 0; }
+  .no-flex-gap .piles > *              { margin: 3px calc(var(--pile-gap) / 2); }
   .no-flex-gap .legend                 { padding: 8px; }
   .no-flex-gap .legend > *             { margin: 4px; }
 }
