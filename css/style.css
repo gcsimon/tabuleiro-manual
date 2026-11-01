@@ -402,19 +402,17 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 
 .board-choices {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  /* 35 boards: always 7 columns × 5 rows. */
+  grid-template-columns: repeat(7, 1fr);
   gap: 8px;
 }
 
 .board-choice {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px 4px 7px;
-  font-size: 11px;
-  line-height: 1.3;
-  text-align: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  min-width: 0;
   color: var(--text2);
   background: var(--bg);
   border: 1.5px solid var(--border);
@@ -422,7 +420,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   cursor: pointer;
   transition: var(--transition);
 }
-.board-choice svg { width: 52px; height: 52px; color: var(--text3); transition: var(--transition); }
+.board-choice svg { width: 72%; height: 72%; color: var(--text3); transition: var(--transition); }
 .board-choice:hover { border-color: var(--border-hover); }
 .board-choice input { position: absolute; opacity: 0; pointer-events: none; }
 
@@ -543,6 +541,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .legend { gap: 8px; padding: 12px; }
   .actions { width: 100%; }
   .board-area { gap: 10px; }
+  .board-choices { gap: 5px; }
   .bucket-col { gap: 26px; }
   .bucket { width: 48px; height: 48px; }
   .bucket svg { width: 34px; height: 34px; }

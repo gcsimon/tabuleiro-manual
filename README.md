@@ -14,8 +14,9 @@ Ao iniciar, o jogo pergunta:
   Morabaraba, Trilha com cruz, Trilha com X, Pentágonos, Tsoro Yematatu,
   Triângulo, Coroa, Grades 4×4, 5×5 e 5×4, 4×4 em X, Alquerque, Gravata, Gravata
   grande, Losangos, Dois e Três círculos, Hexágono, Estrela, Damas 4×4, 6×6 e
-  8×8, Círculo com arcos ou Grade com laços. Os pontos que no slide têm outra
-  cor (um centro, as fileiras onde as peças começam) aparecem como anéis;
+  8×8, Círculo com arcos ou Grade com laços. Cada um aparece só como uma
+  miniatura, sem o nome na tela. Os pontos que no slide têm outra cor (um
+  centro, as fileiras onde as peças começam) aparecem como anéis;
 - quantos buckets cada jogador tem (1 a 3);
 - com quantas peças cada bucket começa (0 a 99 — um bucket vazio serve para
   ir juntando peças durante o jogo);

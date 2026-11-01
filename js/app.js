@@ -279,11 +279,10 @@ for (const { id, name } of Object.values(BOARDS)) {
   radio.name = 'board';
   radio.value = id;
   radio.checked = id === DEFAULT_BOARD;
+  // No caption on screen: the picture is the choice, the name is only for screen readers.
+  radio.setAttribute('aria-label', name);
 
-  const caption = document.createElement('span');
-  caption.textContent = name;
-
-  card.append(radio, renderBoardThumb(BOARDS[id]), caption);
+  card.append(radio, renderBoardThumb(BOARDS[id]));
   boardChoices.appendChild(card);
 }
 
