@@ -573,25 +573,17 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
   .actions { width: 100%; }
   .board-choices { grid-gap: 5px; gap: 5px; }
 
-  /* No room beside the board: it takes the whole width, and each player's
-     buckets go in a row below it, Batman's first, with a faint line between
-     the two rows. */
+  /* No room beside the board: it takes the whole width, with Batman's
+     buckets in a row above it and Homem-Aranha's in a row below. */
   .board-area {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'board' 'bat' 'divider' 'spider';
+    grid-template-areas: 'bat' 'board' 'spider';
     grid-gap: 14px;
     gap: 14px;
   }
   .board-container { grid-area: board; }
   #buckets-bat     { grid-area: bat; }
   #buckets-spider  { grid-area: spider; }
-  .board-area::after {
-    content: '';
-    grid-area: divider;
-    height: 1px;
-    margin: 0 6%;
-    background: linear-gradient(90deg, transparent, rgba(45,226,230,0.45), transparent);
-  }
 
   /* Sizes of buckets and piles, and the gaps around them; smaller on the
      narrowest phones, further down. --slot is the width each bucket gets. */
@@ -612,9 +604,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 
   /* Each bucket sits centred in a slot of the same width for everyone, so
      the buckets are centred on screen and the two players' rows line up.
-     Its piles go below it, centred too, three to a row. */
-  #buckets-bat .bucket-row { flex-direction: column; }
+     Its piles go on the side away from the board, centred, three to a row:
+     below Homem-Aranha's buckets, and above Batman's, where a row of them
+     has room kept even when empty, so the board doesn't move when the
+     first one comes. */
   .bucket-row { flex-direction: column; width: var(--slot); gap: var(--tray-gap); }
+  #buckets-bat .bucket-row { flex-direction: column-reverse; }
   .piles {
     width: auto;
     max-width: 100%;
@@ -624,6 +619,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
     gap: 6px var(--pile-gap);
   }
   .piles:empty { display: none; }
+  #buckets-bat .piles { display: flex; min-height: var(--pile); }
   .pile { width: var(--pile); height: var(--pile); }
   .pile svg { width: 15px; height: 15px; }
   .btn-primary, .btn-secondary { flex: 1; justify-content: center; }
@@ -684,9 +680,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
   .no-flex-gap .actions                { width: calc(100% + 12px); }
   .no-flex-gap .bucket-col             { margin: calc(var(--slot-gap) / -2); }
   .no-flex-gap .bucket-col > *         { margin: calc(var(--slot-gap) / 2); }
-  .no-flex-gap #buckets-spider .piles,
-  .no-flex-gap #buckets-bat .piles {
+  .no-flex-gap #buckets-spider .piles {
     margin: calc(var(--tray-gap) - 3px) calc(var(--pile-gap) / -2) -3px;
+  }
+  .no-flex-gap #buckets-bat .piles {
+    margin: -3px calc(var(--pile-gap) / -2) calc(var(--tray-gap) - 3px);
+    min-height: calc(var(--pile) + 6px);
   }
   .no-flex-gap .piles > *              { margin: 3px calc(var(--pile-gap) / 2); }
   .no-flex-gap .legend                 { padding: 8px; }
