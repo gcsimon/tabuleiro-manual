@@ -4,7 +4,6 @@ import { startDrag } from './drag.js';
 
 // 1 = Batman, 2 = Homem-Aranha
 const PLAYERS = [1, 2];
-const opponent = (fig) => 3 - fig;
 
 const container   = document.getElementById('board-container');
 const countBat    = document.getElementById('count-bat');
@@ -35,10 +34,13 @@ let layout = BOARDS[DEFAULT_BOARD];
 // taken from, so clearing can send it back there.
 let board = [];
 
-// Per player, one entry per bucket: { tone, own, captured }.
-//   tone:     the bucket's colour, an index into PALETTE
-//   own:      how many of the player's own pieces are left
-//   captured: opponent pieces kept there as trophies, counted per tone
+// Per player, one entry per bucket: { tone, own, held }.
+//   tone: the bucket's colour, an index into PALETTE
+//   own:  how many pieces of that colour are left
+//   held: pieces of other colours kept in piles beside it, counted per tone:
+//         the opponent's, captured as trophies, and the player's own from
+//         other buckets. No two buckets share a colour, so the tone alone
+//         tells whose piece it is.
 let buckets = {};
 
 let history = [];
@@ -59,7 +61,7 @@ function newGame(boardId, setups) {
     buckets[fig] = setups[fig].map(({ tone, own }) => ({
       tone,
       own,
-      captured: PALETTE.map(() => 0),
+      held: PALETTE.map(() => 0),
     }));
   }
   history = [];
@@ -78,10 +80,11 @@ function undo() {
   render();
 }
 
-/** Puts a piece into a bucket: as one of its own, or as a trophy. */
+/** Puts a piece into a bucket. It keeps its colour: if that is not the bucket's, it goes on a pile. */
 function store(piece, fig, b) {
-  if (piece.fig === fig) buckets[fig][b].own++;
-  else buckets[fig][b].captured[piece.tone]++;
+  const bucket = buckets[fig][b];
+  if (piece.tone === bucket.tone) bucket.own++;
+  else bucket.held[piece.tone]++;
 }
 
 function clear() {
@@ -116,16 +119,15 @@ function dropTarget(el) {
 function canDrop(source, target) {
   if (!target) return false;
   if (target.type === 'point') return board[target.idx] === null;
-  // A piece on the board can go to any bucket: its own player's to give it
-  // back, the opponent's to capture it. A piece taken from a bucket can go
-  // straight across to the other player's buckets.
-  return source.from === 'point' || target.fig !== source.fig;
+  // A piece can go to any bucket: its own player's to give it back, the
+  // opponent's to capture it. Dropping it on the bucket it came from changes nothing.
+  return source.from === 'point' || target.fig !== source.fig || target.bucket !== source.bucket;
 }
 
 /** Removes the dragged piece from where it was. */
 function take(source) {
   if (source.from === 'bucket') buckets[source.fig][source.bucket].own--;
-  else if (source.from === 'trophy') buckets[source.fig][source.bucket].captured[source.piece.tone]--;
+  else if (source.from === 'pile') buckets[source.fig][source.bucket].held[source.piece.tone]--;
   else board[source.idx] = null;
 }
 
@@ -144,7 +146,7 @@ function drop(source, target) {
 
 /**
  * @param {object}       source - where the piece comes from, and the piece itself:
- *   { from: 'bucket' | 'trophy', fig, bucket, piece } or { from: 'point', idx, piece }
+ *   { from: 'bucket' | 'pile', fig, bucket, piece } or { from: 'point', idx, piece }
  * @param {PointerEvent} event
  */
 function grab(source, event) {
@@ -201,24 +203,33 @@ function bucketEl(fig, b, { tone, own }) {
   return el;
 }
 
-/** One pile per colour of captured opponent pieces, so any of them can be picked. */
-function trophiesEl(fig, b, { captured }) {
-  const el = document.createElement('div');
-  el.className = 'trophies';
-  const other = opponent(fig);
+/** The player whose bucket has this colour. */
+function ownerOf(tone) {
+  return PLAYERS.find((fig) => buckets[fig].some((bucket) => bucket.tone === tone));
+}
 
-  captured.forEach((count, tone) => {
+/**
+ * One pile per colour of the pieces kept beside a bucket, so any of them can
+ * be picked: the opponent's are trophies, the player's own came from another bucket.
+ */
+function pilesEl(fig, b, { held }) {
+  const el = document.createElement('div');
+  el.className = 'piles';
+
+  held.forEach((count, tone) => {
     if (!count) return;
 
+    const owner = ownerOf(tone);
     const pile = document.createElement('div');
-    pile.className = 'trophy';
+    pile.className = owner === fig ? 'pile is-own' : 'pile';
     setColor(pile, tone);
-    pile.title = `${count} ${count === 1 ? 'peça capturada' : 'peças capturadas'} `
-               + `do ${FIGURES[other].name} (${PALETTE[tone].name})`;
-    pile.append(renderPiece(other, tone), badge(count));
+    const noun = count === 1 ? 'peça' : 'peças';
+    const captured = owner === fig ? '' : count === 1 ? ' capturada' : ' capturadas';
+    pile.title = `${count} ${noun}${captured} do ${FIGURES[owner].name} (${PALETTE[tone].name})`;
+    pile.append(renderPiece(owner, tone), badge(count));
 
-    const piece = { fig: other, tone, home: { fig, bucket: b } };
-    pile.addEventListener('pointerdown', (e) => grab({ from: 'trophy', fig, bucket: b, piece }, e));
+    const piece = { fig: owner, tone, home: { fig, bucket: b } };
+    pile.addEventListener('pointerdown', (e) => grab({ from: 'pile', fig, bucket: b, piece }, e));
     el.appendChild(pile);
   });
   return el;
@@ -229,7 +240,7 @@ function bucketRow(fig, b, contents) {
   row.className = 'bucket-row';
   row.dataset.fig = fig;
   row.dataset.bucket = b;
-  row.append(bucketEl(fig, b, contents), trophiesEl(fig, b, contents));
+  row.append(bucketEl(fig, b, contents), pilesEl(fig, b, contents));
   return row;
 }
 

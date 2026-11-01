@@ -26,7 +26,9 @@ Ao iniciar, o jogo pergunta:
   verde e laranja.
 
 Cada bucket mostra uma peça na sua cor e, no canto, quantas ainda restam nele.
-As peças levam a cor do bucket de onde saíram.
+As peças levam a cor do bucket de onde saíram e ficam com ela aonde forem: uma
+peça que entra num bucket de outra cor fica numa pilha ao lado dele, uma pilha
+por cor.
 
 É o equivalente digital de um tabuleiro físico com peças na mão: serve para montar
 posições, demonstrar situações em aula, estudar um problema ou só brincar.
@@ -46,12 +48,12 @@ O tabuleiro é desenhado como SVG inline.
 |------|--------|
 | Arrastar do bucket para um ponto vazio | Coloca uma peça daquele bucket |
 | Arrastar uma peça no tabuleiro | Move a peça para outro ponto vazio |
-| Arrastar uma peça para um bucket do mesmo jogador | Devolve a peça ao bucket |
-| Arrastar uma peça para um bucket do adversário | Captura a peça: ela fica como troféu ao lado desse bucket, numa pilha por cor |
-| Arrastar de um bucket direto para um bucket do adversário | Passa a peça sem usar o tabuleiro: vira troféu dele (ou, vindo de uma pilha de troféus, volta a ser peça normal do dono) |
-| Arrastar de uma pilha de troféus para um ponto vazio | Recoloca uma peça capturada daquela cor (ela continua sendo do adversário) |
+| Arrastar uma peça para um bucket do mesmo jogador | Devolve a peça: no bucket da cor dela, volta para a contagem; em outro, fica numa pilha ao lado dele, com a sua cor (borda contínua) |
+| Arrastar uma peça para um bucket do adversário | Captura a peça: ela fica como troféu ao lado desse bucket, numa pilha por cor (borda tracejada) |
+| Arrastar de um bucket ou de uma pilha direto para outro bucket | Passa a peça sem usar o tabuleiro, do mesmo jeito que se viesse dele |
+| Arrastar de uma pilha para um ponto vazio | Recoloca uma peça daquela cor (ela continua sendo de quem era) |
 | Desfazer | Reverte a última alteração |
-| Limpar tabuleiro | Devolve cada peça ao bucket (ou à pilha de troféus) de onde saiu |
+| Limpar tabuleiro | Devolve cada peça ao bucket (ou à pilha) de onde saiu |
 | Novo jogo | Pergunta de novo tabuleiro, buckets, peças e cores e recomeça |
 
 Soltar em um lugar inválido (ponto ocupado, fora do tabuleiro) cancela o

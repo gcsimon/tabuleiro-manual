@@ -202,7 +202,8 @@ body {
 }
 .bucket.is-empty .bucket-count { background: var(--text3); color: var(--text); }
 
-/* Each bucket has a trophy pile beside it, on the side away from the board. */
+/* Pieces of other colours stay in piles beside the bucket, on the side away
+   from the board. */
 .bucket-row {
   position: relative;
   display: flex;
@@ -212,15 +213,15 @@ body {
 #buckets-bat .bucket-row { flex-direction: row-reverse; }
 
 /* The piles stack up; the column keeps its width even with none, so the
-   board doesn't shift when the first capture lands. */
-.trophies {
+   board doesn't shift when the first pile appears. */
+.piles {
   width: 30px;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.trophy {
+.pile {
   position: relative;
   width: 28px; height: 28px;
   display: grid;
@@ -232,8 +233,10 @@ body {
   touch-action: none;
   user-select: none;
 }
-.trophy svg { width: 20px; height: 20px; overflow: visible; }
-.trophy .bucket-count {
+/* Trophies have a dashed rim; the player's own pieces from another bucket a solid one. */
+.pile.is-own { border-style: solid; }
+.pile svg { width: 20px; height: 20px; overflow: visible; }
+.pile .bucket-count {
   right: -7px; bottom: -5px;
   min-width: 15px; height: 15px;
   padding: 0 4px;
@@ -545,7 +548,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .bucket svg { width: 34px; height: 34px; }
   .bucket-count { min-width: 19px; height: 19px; font-size: 11px; }
   /* No room beside the bucket: the piles sit over its outer edge. */
-  .trophies {
+  .piles {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
@@ -553,9 +556,9 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
     gap: 2px;
     z-index: 1;
   }
-  #buckets-bat    .trophies { left: -12px; }
-  #buckets-spider .trophies { right: -12px; }
-  .trophy { width: 22px; height: 22px; }
-  .trophy svg { width: 15px; height: 15px; }
+  #buckets-bat    .piles { left: -12px; }
+  #buckets-spider .piles { right: -12px; }
+  .pile { width: 22px; height: 22px; }
+  .pile svg { width: 15px; height: 15px; }
   .btn-primary, .btn-secondary { flex: 1; justify-content: center; }
 }
