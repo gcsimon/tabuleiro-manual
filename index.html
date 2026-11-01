@@ -13,12 +13,6 @@
 
   <div class="wrapper">
 
-    <header class="board-header">
-      <span class="kicker">Modo livre</span>
-      <h1 class="main-title">Tabuleiro <span class="highlight">Manual</span></h1>
-      <p class="subtitle">Sem regras, sem turnos, sem vencedor. Arraste as peças dos buckets e monte a posição que quiser.</p>
-    </header>
-
     <div class="board-area">
       <div class="bucket-col" id="buckets-bat" aria-label="Buckets do Batman"></div>
       <div id="board-container" class="board-container"></div>
@@ -71,6 +65,12 @@
   </div>
 
   <dialog id="setup" class="setup">
+    <!-- The introduction shows here, not over the board while playing. -->
+    <header class="setup-intro">
+      <span class="kicker">Modo livre</span>
+      <h1 class="main-title">Tabuleiro <span class="highlight">Manual</span></h1>
+      <p class="subtitle">Sem regras, sem turnos, sem vencedor. Arraste as peças dos buckets e monte a posição que quiser.</p>
+    </header>
     <form method="dialog" id="setup-form">
       <h2 class="setup-title">Novo jogo</h2>
       <fieldset class="setup-boards">

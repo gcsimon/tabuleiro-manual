@@ -60,7 +60,7 @@ body::before {
 .wrapper {
   max-width: 760px;
   margin: 0 auto;
-  padding: 44px 20px 32px;
+  padding: 28px 20px 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -68,9 +68,14 @@ body::before {
 }
 
 /* ============================================================
-   HEADER
+   INTRODUCTION — top of the setup dialog, kept off the board screen
    ============================================================ */
-.board-header { text-align: center; }
+.setup-intro {
+  text-align: center;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
 
 .kicker {
   display: inline-block;
@@ -81,13 +86,13 @@ body::before {
   text-transform: uppercase;
   color: var(--neon);
   text-shadow: 0 0 12px var(--neon-glow);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .main-title {
   font-family: var(--font-display);
-  font-size: 28px;                       /* for browsers without clamp() */
-  font-size: clamp(24px, 6.4vw, 36px);
+  font-size: 26px;                       /* for browsers without clamp() */
+  font-size: clamp(22px, 6vw, 32px);
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: 2px;
@@ -101,7 +106,7 @@ body::before {
 }
 
 .subtitle {
-  margin-top: 12px;
+  margin-top: 10px;
   font-size: 14px;
   line-height: 1.6;
   color: var(--text2);
@@ -563,7 +568,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
    RESPONSIVE
    ============================================================ */
 @media (max-width: 460px) {
-  .wrapper { padding: 30px 16px 24px; gap: 20px; }
+  .wrapper { padding: 18px 16px 24px; gap: 20px; }
   .legend { gap: 8px; padding: 12px; }
   .actions { width: 100%; }
   .board-choices { grid-gap: 5px; gap: 5px; }
