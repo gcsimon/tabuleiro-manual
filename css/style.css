@@ -1,3 +1,7 @@
+/* Runs on older browsers too (Chrome 61+, iOS 13+): no :has(), no color-mix(),
+   no aspect-ratio or gap in flexbox without a fallback. See OLDER BROWSERS at
+   the end. */
+
 /* ============================================================
    RESET & CUSTOM PROPERTIES
    ============================================================ */
@@ -37,12 +41,20 @@ body {
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+}
 
-  /* Two faint pools of colour so the near-black never reads as flat. */
+/* Two faint pools of colour so the near-black never reads as flat. A fixed
+   layer rather than background-attachment: fixed, which phones repaint on
+   every scroll. */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(ellipse 70% 50% at 20% 0%,  rgba(45,226,230,0.10), transparent 70%),
     radial-gradient(ellipse 60% 45% at 85% 12%, rgba(255,46,91,0.08),  transparent 70%);
-  background-attachment: fixed;
 }
 
 .wrapper {
@@ -74,6 +86,7 @@ body {
 
 .main-title {
   font-family: var(--font-display);
+  font-size: 28px;                       /* for browsers without clamp() */
   font-size: clamp(24px, 6.4vw, 36px);
   font-weight: 800;
   line-height: 1.15;
@@ -103,6 +116,7 @@ body {
   grid-template-columns: auto minmax(0, 380px) auto;
   justify-content: center;
   align-items: center;
+  grid-gap: 18px;                        /* gap's name before Chrome 66 */
   gap: 18px;
 }
 
@@ -165,16 +179,19 @@ body {
   border-radius: var(--radius);
   cursor: grab;
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
   transition: var(--transition);
 }
 .bucket svg { width: 44px; height: 44px; overflow: visible; }
 
-/* Each bucket sets its own --c (colour) and --ink (badge text) inline. */
-.bucket { border-color: color-mix(in srgb, var(--c) 40%, transparent); }
+/* Each bucket sets its own --c (colour), --c-rgb (the same, as "r, g, b", for
+   see-through shades) and --ink (badge text) inline. */
+.bucket { border-color: rgba(var(--c-rgb), 0.4); }
 .bucket:hover:not(.is-empty) {
   border-color: var(--c);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent);
+  box-shadow: 0 0 14px rgba(var(--c-rgb), 0.45);
 }
 
 .bucket.is-empty { cursor: default; }
@@ -228,11 +245,13 @@ body {
   display: grid;
   place-items: center;
   background: var(--bg);
-  border: 1.5px dashed color-mix(in srgb, var(--c) 60%, transparent);
+  border: 1.5px dashed rgba(var(--c-rgb), 0.6);
   border-radius: 50%;
   cursor: grab;
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 /* Trophies have a dashed rim; the player's own pieces from another bucket a solid one. */
 .pile.is-own { border-style: solid; }
@@ -247,7 +266,7 @@ body {
 /* ============================================================
    DRAG
    ============================================================ */
-.piece-icon { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--c) 45%, transparent)); }
+.piece-icon { filter: drop-shadow(0 0 5px rgba(var(--c-rgb), 0.45)); }
 
 .drag-ghost {
   position: fixed;
@@ -256,9 +275,11 @@ body {
   overflow: visible;
   pointer-events: none;
   z-index: 100;
+  /* Its own layer: moving it doesn't repaint the board underneath. */
+  will-change: transform;
 }
 
-body.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }
+body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-select: none; user-select: none; }
 
 /* ============================================================
    LEGEND
@@ -366,7 +387,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .hint strong { color: var(--text2); font-weight: 600; }
 
 .board-footer {
-  margin-top: 6px;
+  padding-top: 6px;
   font-size: 11.5px;
   color: var(--text3);
   text-align: center;
@@ -377,7 +398,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
    ============================================================ */
 .setup {
   margin: auto;
-  width: min(760px, calc(100% - 32px));
+  width: calc(100% - 32px);
+  max-width: 760px;
   color-scheme: dark;
   padding: 26px 24px 22px;
   background: var(--panel);
@@ -386,7 +408,10 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   border-radius: var(--radius);
   box-shadow: 0 0 40px rgba(45,226,230,0.18);
 }
-.setup::backdrop { background: rgba(4,5,8,0.75); backdrop-filter: blur(3px); }
+/* Darker rather than blurred: a blur behind the dialog is slow on older devices. */
+.setup::backdrop { background: rgba(4,5,8,0.82); }
+/* Browsers with <dialog> do this themselves; app.js covers the others. */
+.setup:not([open]) { display: none; }
 
 .setup-title {
   font-family: var(--font-display);
@@ -405,33 +430,34 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   display: grid;
   /* 35 boards: always 7 columns × 5 rows. */
   grid-template-columns: repeat(7, 1fr);
+  grid-gap: 8px;
   gap: 8px;
 }
 
-.board-choice {
+.board-choice { display: block; position: relative; min-width: 0; cursor: pointer; }
+.board-choice input { position: absolute; opacity: 0; pointer-events: none; }
+
+/* The card is the box right after the radio, so it follows the radio's state
+   with + (older browsers have no :has()). */
+.board-choice-box {
   display: flex;
   align-items: center;
   justify-content: center;
   aspect-ratio: 1;
-  min-width: 0;
-  color: var(--text2);
   background: var(--bg);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
-  cursor: pointer;
   transition: var(--transition);
 }
-.board-choice svg { width: 72%; height: 72%; color: var(--text3); transition: var(--transition); }
-.board-choice:hover { border-color: var(--border-hover); }
-.board-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.board-choice-box svg { width: 72%; height: 72%; color: var(--text3); transition: var(--transition); }
+.board-choice:hover .board-choice-box { border-color: var(--border-hover); }
 
-.board-choice:has(input:checked) {
-  color: var(--text);
+.board-choice input:checked + .board-choice-box {
   border-color: var(--neon);
   box-shadow: 0 0 12px var(--neon-glow);
 }
-.board-choice:has(input:checked) svg { color: var(--neon); }
-.board-choice:has(input:focus-visible) { outline: 2px solid var(--neon); outline-offset: 2px; }
+.board-choice input:checked + .board-choice-box svg { color: var(--neon); }
+.board-choice input:focus-visible + .board-choice-box { outline: 2px solid var(--neon); outline-offset: 2px; }
 
 .setup-field {
   display: flex;
@@ -460,6 +486,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .player-setups {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  grid-gap: 18px 28px;
   gap: 18px 28px;
 }
 
@@ -475,17 +502,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .setup-player legend svg { width: 20px; height: 20px; overflow: visible; }
 .setup-player .setup-field { margin-bottom: 4px; }
 
-/* Each bucket: a preview of its piece, how many it starts with, its colour. */
-.bucket-setup {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  border: none;
-  min-width: 0;
-}
-/* Its own display would otherwise win over [hidden]. */
-.bucket-setup[hidden] { display: none; }
+/* Each bucket: a preview of its piece, how many it starts with, its colour.
+   The line inside the fieldset lays them out: older browsers can't make a
+   fieldset a flex container. */
+.bucket-setup { margin-top: 10px; border: none; min-width: 0; }
+.bucket-setup-line { display: flex; align-items: center; gap: 10px; }
 
 .bucket-preview { flex-shrink: 0; width: 32px; height: 32px; }
 .bucket-preview svg { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -494,33 +515,37 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 
 .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.swatch {
+.swatch { position: relative; cursor: pointer; }
+.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+
+/* The colour is the dot right after the radio, so it follows the radio's
+   state with + (older browsers have no :has()). */
+.swatch-dot {
   position: relative;
+  display: block;
   width: 20px; height: 20px;
   border-radius: 50%;
   background: var(--c);
-  cursor: pointer;
   transition: var(--transition);
 }
-.swatch:hover { transform: scale(1.15); }
-.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.swatch:hover .swatch-dot { transform: scale(1.15); }
 
 /* The chosen colour gets a ring, set off from the swatch by a dark gap. */
-.swatch:has(input:checked) {
+.swatch input:checked + .swatch-dot {
   box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--c),
-              0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
+              0 0 12px rgba(var(--c-rgb), 0.6);
 }
-.swatch:has(input:focus-visible) { outline: 2px solid var(--neon); outline-offset: 5px; }
+.swatch input:focus-visible + .swatch-dot { outline: 2px solid var(--neon); outline-offset: 5px; }
 
 /* A colour another bucket is using: hollow and struck through. */
-.swatch:has(input:disabled) {
+.swatch input:disabled + .swatch-dot {
   opacity: 0.5;
   background: transparent;
   box-shadow: inset 0 0 0 2px var(--c);
   cursor: not-allowed;
   transform: none;
 }
-.swatch:has(input:disabled)::after {
+.swatch input:disabled + .swatch-dot::after {
   content: '';
   position: absolute;
   left: -1px; right: -1px; top: 50%;
@@ -541,8 +566,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .wrapper { padding: 30px 16px 24px; gap: 20px; }
   .legend { gap: 8px; padding: 12px; }
   .actions { width: 100%; }
-  .board-area { gap: 10px; }
-  .board-choices { gap: 5px; }
+  .board-area { grid-gap: 10px; gap: 10px; }
+  .board-choices { grid-gap: 5px; gap: 5px; }
   .bucket-col { gap: 26px; }
   .bucket { width: 48px; height: 48px; }
   .bucket svg { width: 34px; height: 34px; }
@@ -562,3 +587,77 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .pile svg { width: 15px; height: 15px; }
   .btn-primary, .btn-secondary { flex: 1; justify-content: center; }
 }
+
+/* ============================================================
+   OLDER BROWSERS
+   ============================================================ */
+
+/* No gap in flexbox (Chrome < 84, iOS < 14.5): app.js then sets .no-flex-gap
+   on <html>, and margins stand in for it. gap: 0 only matters when testing
+   these rules on a browser that does have it. */
+.no-flex-gap .wrapper,
+.no-flex-gap .bucket-col,
+.no-flex-gap .bucket-row,
+.no-flex-gap .piles,
+.no-flex-gap .legend,
+.no-flex-gap .legend-item,
+.no-flex-gap .actions,
+.no-flex-gap .btn-primary,
+.no-flex-gap .btn-secondary,
+.no-flex-gap .setup-field,
+.no-flex-gap .setup-player legend,
+.no-flex-gap .bucket-setup-line,
+.no-flex-gap .swatches,
+.no-flex-gap .setup-actions { gap: 0; }
+
+.no-flex-gap .wrapper > * + *          { margin-top: 26px; }
+.no-flex-gap .bucket-col > * + *       { margin-top: 14px; }
+.no-flex-gap #buckets-spider .piles    { margin-left: 8px; }
+.no-flex-gap #buckets-bat .piles       { margin-right: 8px; }
+.no-flex-gap .piles > * + *            { margin-top: 4px; }
+.no-flex-gap .legend                   { padding: 9px; }
+.no-flex-gap .legend > *               { margin: 5px 13px; }
+.no-flex-gap .legend-item > * + *      { margin-left: 8px; }
+.no-flex-gap .actions > * + *          { margin-left: 12px; }
+.no-flex-gap .btn-primary svg,
+.no-flex-gap .btn-secondary svg        { margin-right: 8px; }
+.no-flex-gap .setup-field > * + *      { margin-left: 16px; }
+.no-flex-gap .setup-player legend svg  { margin-right: 8px; }
+.no-flex-gap .bucket-setup-line > * + * { margin-left: 10px; }
+.no-flex-gap .swatches                 { margin: -3px; }
+.no-flex-gap .bucket-setup-line .swatches { margin-left: 7px; }
+.no-flex-gap .swatch                   { margin: 3px; }
+.no-flex-gap .setup-actions > * + *    { margin-left: 10px; }
+
+@media (max-width: 460px) {
+  .no-flex-gap .wrapper > * + *        { margin-top: 20px; }
+  .no-flex-gap .bucket-col > * + *     { margin-top: 26px; }
+  .no-flex-gap #buckets-spider .piles,
+  .no-flex-gap #buckets-bat .piles     { margin: 0; }
+  .no-flex-gap .piles > * + *          { margin-top: 2px; }
+  .no-flex-gap .legend                 { padding: 8px; }
+  .no-flex-gap .legend > *             { margin: 4px; }
+}
+
+/* No aspect-ratio (Chrome < 88, iOS < 15): the squares come from padding. */
+@supports not (aspect-ratio: 1) {
+  .board-container { position: relative; height: 0; padding-top: 100%; }
+  .board-container .board { position: absolute; top: 0; left: 0; }
+  .board-choice-box { position: relative; height: 0; padding-top: 100%; }
+  .board-choice-box svg { position: absolute; top: 14%; left: 14%; }
+}
+
+/* No <dialog> (iOS < 15.4): app.js opens it by setting [open] and sets
+   .no-dialog on <html>; it is laid over the page here, the shadow standing in
+   for the backdrop. */
+.no-dialog .setup[open] {
+  display: block;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  z-index: 200;
+  box-shadow: 0 0 40px rgba(45,226,230,0.18), 0 0 0 100vmax rgba(4,5,8,0.82);
+}
+.no-dialog.setup-open .wrapper { pointer-events: none; }

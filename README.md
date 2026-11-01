@@ -41,6 +41,24 @@ posições, demonstrar situações em aula, estudar um problema ou só brincar.
 Vanilla JavaScript (ES modules), HTML e CSS — sem frameworks, sem build step.
 O tabuleiro é desenhado como SVG inline.
 
+### Compatibilidade
+
+Feito para funcionar também em aparelhos mais antigos: Chrome 61+ (Android) e
+Safari do iOS 13+.
+Para isso o código evita recursos recentes, ou tem uma alternativa para eles:
+
+- JS: nada de `?.`, `??`, `structuredClone`, `replaceChildren` nem
+  `Object.fromEntries`.
+- CSS: nada de `:has()` (o estado dos botões de rádio é seguido com `+`) nem
+  `color-mix()` (cada cor também vem como `--c-rgb`, para usar em
+  `rgba(var(--c-rgb), alfa)`).
+- `gap` em flexbox, `aspect-ratio` e `<dialog>` têm alternativa no fim de
+  `css/style.css` (seção OLDER BROWSERS); para `gap` e `<dialog>` o `app.js`
+  detecta o navegador e marca o `<html>` com `.no-flex-gap` / `.no-dialog`.
+
+No iOS 12 ou anterior o jogo deve abrir, mas não dá para arrastar as peças
+(não há pointer events).
+
 ---
 
 ## Como usar

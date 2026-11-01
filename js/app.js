@@ -1,6 +1,25 @@
-import { renderBoard, renderBoardThumb, renderFigureIcon, renderPiece, FIGURES, PALETTE } from './board.js';
+import { renderBoard, renderBoardThumb, renderFigureIcon, renderPiece, setColorVars, FIGURES, PALETTE } from './board.js';
 import { BOARDS, DEFAULT_BOARD } from './boards.js';
 import { startDrag } from './drag.js';
+
+// Older browsers (Chrome < 84, iOS < 14.5) ignore gap in a flex container:
+// style.css then puts margins in its place, under .no-flex-gap.
+function hasFlexGap() {
+  const box = document.createElement('div');
+  box.style.cssText = 'display: flex; flex-direction: column; gap: 1px; position: absolute';
+  box.append(document.createElement('div'), document.createElement('div'));
+  document.body.appendChild(box);
+  const ok = box.scrollHeight === 1;
+  box.remove();
+  return ok;
+}
+if (!hasFlexGap()) document.documentElement.classList.add('no-flex-gap');
+
+/** Empties `el` and puts `children` in it (Element.replaceChildren is too new for older browsers). */
+function setChildren(el, ...children) {
+  el.textContent = '';
+  el.append(...children);
+}
 
 // 1 = Batman, 2 = Homem-Aranha
 const PLAYERS = [1, 2];
@@ -70,7 +89,8 @@ function newGame(boardId, setups) {
 }
 
 function pushHistory() {
-  history.push(structuredClone({ board, buckets }));
+  // A deep copy. The state is plain data, so JSON does it (structuredClone is too new for older browsers).
+  history.push(JSON.parse(JSON.stringify({ board, buckets })));
   if (history.length > 100) history.shift();
 }
 
@@ -101,10 +121,11 @@ function clear() {
 
 /** What a drag would land on, given the element under the pointer. */
 function dropTarget(el) {
-  const point = el?.closest('.point-hit');
+  if (!el) return null;
+  const point = el.closest('.point-hit');
   if (point) return { type: 'point', idx: Number(point.dataset.idx), el: point };
 
-  const row = el?.closest('.bucket-row');
+  const row = el.closest('.bucket-row');
   if (row) {
     return {
       type: 'bucket',
@@ -153,14 +174,15 @@ function grab(source, event) {
   if (event.button !== 0) return;
 
   if (source.from === 'point') {
-    container.querySelector(`.piece[data-idx="${source.idx}"]`)?.classList.add('is-lifted');
+    const lifted = container.querySelector(`.piece[data-idx="${source.idx}"]`);
+    if (lifted) lifted.classList.add('is-lifted');
   }
 
   let over = null;
   startDrag(event, {
     ghost: renderPiece(source.piece.fig, source.piece.tone),
     onOver(el) {
-      over?.el.classList.remove('drop-ok');
+      if (over) over.el.classList.remove('drop-ok');
       over = dropTarget(el);
       if (canDrop(source, over)) over.el.classList.add('drop-ok');
     },
@@ -181,7 +203,7 @@ function badge(count) {
 
 function setColor(el, tone) {
   const { color, ink } = PALETTE[tone];
-  el.style.setProperty('--c', color);
+  setColorVars(el, color);
   el.style.setProperty('--ink', ink);
 }
 
@@ -245,17 +267,17 @@ function bucketRow(fig, b, contents) {
 }
 
 function render(animateIdx = null) {
-  container.replaceChildren(renderBoard(layout, board, {
+  setChildren(container, renderBoard(layout, board, {
     animateIdx,
     onGrab: (idx, e) => grab({ from: 'point', idx, piece: board[idx] }, e),
   }));
 
   for (const fig of PLAYERS) {
-    bucketCols[fig].replaceChildren(...buckets[fig].map((c, b) => bucketRow(fig, b, c)));
+    setChildren(bucketCols[fig], ...buckets[fig].map((c, b) => bucketRow(fig, b, c)));
   }
 
-  countBat.textContent    = board.filter((p) => p?.fig === 1).length;
-  countSpider.textContent = board.filter((p) => p?.fig === 2).length;
+  countBat.textContent    = board.filter((p) => p && p.fig === 1).length;
+  countSpider.textContent = board.filter((p) => p && p.fig === 2).length;
   btnUndo.disabled = history.length === 0;
 }
 
@@ -282,7 +304,13 @@ for (const { id, name } of Object.values(BOARDS)) {
   // No caption on screen: the picture is the choice, the name is only for screen readers.
   radio.setAttribute('aria-label', name);
 
-  card.append(radio, renderBoardThumb(BOARDS[id]));
+  // The card is drawn by a box right after the radio, so CSS can follow the
+  // radio's state with `+` (older browsers have no :has()).
+  const box = document.createElement('span');
+  box.className = 'board-choice-box';
+  box.appendChild(renderBoardThumb(BOARDS[id]));
+
+  card.append(radio, box);
   boardChoices.appendChild(card);
 }
 
@@ -292,7 +320,7 @@ function swatch(name, tone, checked) {
   const label = document.createElement('label');
   label.className = 'swatch';
   label.title = colorName;
-  label.style.setProperty('--c', color);
+  setColorVars(label, color);
 
   const radio = document.createElement('input');
   radio.type = 'radio';
@@ -301,7 +329,12 @@ function swatch(name, tone, checked) {
   radio.checked = checked;
   radio.setAttribute('aria-label', colorName);
 
-  label.appendChild(radio);
+  // The colour is drawn by a dot right after the radio, so CSS can follow the
+  // radio's state with `+` (older browsers have no :has()).
+  const dot = document.createElement('span');
+  dot.className = 'swatch-dot';
+
+  label.append(radio, dot);
   return label;
 }
 
@@ -356,11 +389,16 @@ function bucketSetup(fig, b) {
 
   // The preview shows the piece in the colour picked.
   swatches.addEventListener('change', (e) => {
-    preview.replaceChildren(renderPiece(fig, Number(e.target.value)));
+    setChildren(preview, renderPiece(fig, Number(e.target.value)));
     syncSwatches();
   });
 
-  row.append(preview, pieces, swatches);
+  // The fieldset groups and disables; a line inside lays the parts out, since
+  // older browsers can't make a fieldset a flex container.
+  const line = document.createElement('div');
+  line.className = 'bucket-setup-line';
+  line.append(preview, pieces, swatches);
+  row.appendChild(line);
   return row;
 }
 
@@ -409,12 +447,34 @@ function playerSetup(fig) {
 
 document.getElementById('player-setups').append(...PLAYERS.map(playerSetup));
 
+// Older browsers (iOS < 15.4) have no <dialog>: there it is opened by setting
+// [open], and style.css lays it over the page.
+const hasDialog = typeof setup.showModal === 'function';
+if (!hasDialog) document.documentElement.classList.add('no-dialog');
+
 function openSetup() {
   setupCancel.hidden = !started;
-  setup.showModal();
+  if (hasDialog) {
+    setup.showModal();
+  } else {
+    setup.setAttribute('open', '');
+    document.documentElement.classList.add('setup-open');
+  }
 }
 
-setupForm.addEventListener('submit', () => {
+function closeSetup() {
+  if (hasDialog) {
+    setup.close();
+  } else {
+    setup.removeAttribute('open');
+    document.documentElement.classList.remove('setup-open');
+  }
+}
+
+setupForm.addEventListener('submit', (e) => {
+  // Closed here rather than by method="dialog": without <dialog>, that would be
+  // an ordinary submit, and the page would reload.
+  e.preventDefault();
   const data = new FormData(setupForm);
   const setups = {};
   for (const fig of PLAYERS) {
@@ -424,9 +484,10 @@ setupForm.addEventListener('submit', () => {
     }));
   }
   newGame(data.get('board'), setups);
+  closeSetup();
 });
 
-setupCancel.addEventListener('click', () => setup.close());
+setupCancel.addEventListener('click', closeSetup);
 
 // Before the first game there is nothing to go back to.
 setup.addEventListener('cancel', (e) => {

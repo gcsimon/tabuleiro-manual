@@ -344,7 +344,9 @@ const LAYOUTS = [
   { id: 'lacos',       name: 'Grade com laços',         ...loops(4) },
 ];
 
-export const BOARDS = Object.fromEntries(LAYOUTS.map(({ id, name, ...shape }) => {
+// Filled by a loop: Object.fromEntries is too new for older browsers.
+export const BOARDS = {};
+for (const { id, name, ...shape } of LAYOUTS) {
   const { points, lines, curves, marked } = fit(shape);
 
   // Pieces and drop areas shrink on boards whose points sit close together.
@@ -355,6 +357,6 @@ export const BOARDS = Object.fromEntries(LAYOUTS.map(({ id, name, ...shape }) =>
   const pieceScale = Math.min(1, (min * 0.42) / PIECE_R);
   const hitR = Math.min(HIT_R, min / 2 - 1);
 
-  return [id, { id, name, points, lines, curves, marked, pieceScale, hitR }];
-}));
+  BOARDS[id] = { id, name, points, lines, curves, marked, pieceScale, hitR };
+}
 export const DEFAULT_BOARD = LAYOUTS[0].id;

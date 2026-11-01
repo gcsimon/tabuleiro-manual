@@ -29,14 +29,24 @@ export const PALETTE = [
 
 const glowId = (color) => `tmGlow${color.slice(1)}`;
 
+/**
+ * Gives `el` the CSS variables of a colour: --c, and --c-rgb for see-through
+ * shades, written rgba(var(--c-rgb), alpha) since older browsers lack color-mix().
+ */
+export function setColorVars(el, color) {
+  el.style.setProperty('--c', color);
+  el.style.setProperty('--c-rgb', [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)).join(', '));
+}
+
 function el(tag, attrs) {
   const e = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
   return e;
 }
 
+// The glow's area is the whole board: it is put on groups spread across it.
 function glowFilter(id, color, blur) {
-  const f = el('filter', { id, x: '-80%', y: '-80%', width: '260%', height: '260%' });
+  const f = el('filter', { id, filterUnits: 'userSpaceOnUse', x: 0, y: 0, width: SIZE, height: SIZE });
   const b = el('feDropShadow', { dx: '0', dy: '0', stdDeviation: blur });
   b.setAttribute('flood-color', color);
   b.setAttribute('flood-opacity', '0.9');
@@ -128,9 +138,9 @@ export function renderPiece(value, tone) {
     viewBox: `${-r} ${-r} ${2 * r} ${2 * r}`,
     xmlns: NS,
     class: 'piece-icon',
-    style: `--c: ${color}`,
     'aria-hidden': 'true',
   });
+  setColorVars(svg, color);
   svg.appendChild(pieceShape(value, color));
   return svg;
 }
@@ -209,6 +219,14 @@ export function renderBoard(layout, state, options = {}) {
   }));
 
   // ── Points and pieces ─────────────────────────────────────────
+  // Each glow is an SVG filter, slow on older devices, so a filter goes on a
+  // group rather than on each element: one for the empty points, one per
+  // piece colour. The hit targets come last, on top of everything.
+  const marks = el('g', { filter: 'url(#tmGlowLine)' });
+  svg.appendChild(marks);
+  const pieceGroups = new Map();   // colour → its group
+  const hits = el('g', {});
+
   layout.points.forEach(([cx, cy], idx) => {
     const piece = state[idx];
     const figure = FIGURES[piece ? piece.fig : 0];
@@ -218,26 +236,24 @@ export function renderBoard(layout, state, options = {}) {
       const mark = layout.marked.includes(idx)
         ? { r: 7, fill: '#0b0d14', stroke: '#2de2e6', 'stroke-width': '2' }
         : { r: 4.5, fill: '#2de2e6' };
-      svg.appendChild(el('circle', {
-        cx, cy, ...mark,
-        filter: 'url(#tmGlowLine)',
-        class: 'point-empty',
-      }));
+      marks.appendChild(el('circle', { cx, cy, ...mark, class: 'point-empty' }));
     } else {
-      // The placement lives on the outer group: the inner one is animated by CSS.
       const { color } = PALETTE[piece.tone];
-      const holder = el('g', {
-        transform: `translate(${cx} ${cy}) scale(${layout.pieceScale})`,
-        filter: `url(#${glowId(color)})`,
-      });
+      if (!pieceGroups.has(color)) {
+        const group = el('g', { filter: `url(#${glowId(color)})` });
+        pieceGroups.set(color, group);
+        svg.appendChild(group);
+      }
+      // The placement lives on the outer group: the inner one is animated by CSS.
+      const holder = el('g', { transform: `translate(${cx} ${cy}) scale(${layout.pieceScale})` });
       const shape = pieceShape(piece.fig, color);
       shape.dataset.idx = idx;
       if (idx === animateIdx) shape.classList.add('is-new');
       holder.appendChild(shape);
-      svg.appendChild(holder);
+      pieceGroups.get(color).appendChild(holder);
     }
 
-    // Transparent hit target on top, one per point. Also the drop target.
+    // Transparent hit target, one per point. Also the drop target.
     const hit = el('circle', {
       cx, cy, r: layout.hitR,
       fill: 'transparent',
@@ -253,8 +269,9 @@ export function renderBoard(layout, state, options = {}) {
       hit.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     }
 
-    svg.appendChild(hit);
+    hits.appendChild(hit);
   });
 
+  svg.appendChild(hits);
   return svg;
 }
