@@ -566,26 +566,68 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
   .wrapper { padding: 30px 16px 24px; gap: 20px; }
   .legend { gap: 8px; padding: 12px; }
   .actions { width: 100%; }
-  .board-area { grid-gap: 10px; gap: 10px; }
   .board-choices { grid-gap: 5px; gap: 5px; }
-  .bucket-col { gap: 26px; }
-  .bucket { width: 48px; height: 48px; }
+
+  /* No room beside the board: it takes the whole width, and each player's
+     buckets go in a row below it, Batman's first, with a faint line between
+     the two rows. */
+  .board-area {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'board' 'bat' 'divider' 'spider';
+    grid-gap: 14px;
+    gap: 14px;
+  }
+  .board-container { grid-area: board; }
+  #buckets-bat     { grid-area: bat; }
+  #buckets-spider  { grid-area: spider; }
+  .board-area::after {
+    content: '';
+    grid-area: divider;
+    height: 1px;
+    margin: 0 6%;
+    background: linear-gradient(90deg, transparent, rgba(45,226,230,0.45), transparent);
+  }
+
+  /* Sizes of buckets and piles, and the gaps around them; smaller on the
+     narrowest phones, further down. */
+  .board-area { --bucket: 48px; --pile: 22px; --pile-gap: 7px; --tray-gap: 8px; --slot-gap: 10px; }
+
+  .bucket-col {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--slot-gap);
+  }
+  .bucket { width: var(--bucket); height: var(--bucket); }
   .bucket svg { width: 34px; height: 34px; }
   .bucket-count { min-width: 19px; height: 19px; font-size: 11px; }
-  /* No room beside the bucket: the piles sit over its outer edge. */
+
+  /* The piles go right of the bucket for both players, in two rows as tall
+     as the bucket. Room for two columns is kept even when empty, so the two
+     players' buckets line up; a fifth pile opens a third column. */
+  #buckets-bat .bucket-row { flex-direction: row; }
+  .bucket-row { gap: var(--tray-gap); }
   .piles {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
     width: auto;
-    gap: 2px;
-    z-index: 1;
+    min-width: calc(2 * var(--pile) + var(--pile-gap));
+    display: grid;
+    grid-template-rows: repeat(2, var(--pile));
+    grid-auto-flow: column;
+    grid-auto-columns: var(--pile);
+    grid-gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
+    gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
   }
-  #buckets-bat    .piles { left: -12px; }
-  #buckets-spider .piles { right: -12px; }
-  .pile { width: 22px; height: 22px; }
+  .pile { width: var(--pile); height: var(--pile); }
   .pile svg { width: 15px; height: 15px; }
   .btn-primary, .btn-secondary { flex: 1; justify-content: center; }
+}
+
+/* The narrowest phones (down to 320px): three buckets with their piles still
+   fit in a row. */
+@media (max-width: 374px) {
+  .board-area { --bucket: 42px; --pile: 18px; --pile-gap: 6px; --tray-gap: 7px; --slot-gap: 7px; }
+  .bucket svg { width: 30px; height: 30px; }
+  .pile svg { width: 13px; height: 13px; }
 }
 
 /* ============================================================
@@ -618,7 +660,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 .no-flex-gap .legend                   { padding: 9px; }
 .no-flex-gap .legend > *               { margin: 5px 13px; }
 .no-flex-gap .legend-item > * + *      { margin-left: 8px; }
-.no-flex-gap .actions > * + *          { margin-left: 12px; }
+.no-flex-gap .actions                  { margin-left: -6px; margin-right: -6px; margin-bottom: -12px; }
+.no-flex-gap .actions > *              { margin: 0 6px 12px; }
 .no-flex-gap .btn-primary svg,
 .no-flex-gap .btn-secondary svg        { margin-right: 8px; }
 .no-flex-gap .setup-field > * + *      { margin-left: 16px; }
@@ -631,10 +674,17 @@ body.dragging, body.dragging * { cursor: grabbing !important; -webkit-user-selec
 
 @media (max-width: 460px) {
   .no-flex-gap .wrapper > * + *        { margin-top: 20px; }
-  .no-flex-gap .bucket-col > * + *     { margin-top: 26px; }
+  .no-flex-gap .actions                { width: calc(100% + 12px); }
+  .no-flex-gap .bucket-col             { margin: calc(var(--slot-gap) / -2); }
+  .no-flex-gap .bucket-col > *         { margin: calc(var(--slot-gap) / 2); }
   .no-flex-gap #buckets-spider .piles,
-  .no-flex-gap #buckets-bat .piles     { margin: 0; }
-  .no-flex-gap .piles > * + *          { margin-top: 2px; }
+  .no-flex-gap #buckets-bat .piles     { margin: 0 0 0 var(--tray-gap); }
+  /* The piles are a grid here, and grids have gap on these browsers too. */
+  .no-flex-gap .piles {
+    grid-gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
+    gap: calc(var(--bucket) - 2 * var(--pile)) var(--pile-gap);
+  }
+  .no-flex-gap .piles > * + *          { margin-top: 0; }
   .no-flex-gap .legend                 { padding: 8px; }
   .no-flex-gap .legend > *             { margin: 4px; }
 }

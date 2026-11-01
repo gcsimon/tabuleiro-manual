@@ -4,7 +4,9 @@ Um tabuleiro clicável, sem regras.
 
 Não há turnos, não há jogadas válidas ou inválidas, não há vencedor. Cada jogador
 (Batman e Homem-Aranha) tem seus **buckets** de peças, um de cada lado do tabuleiro,
-e as peças são levadas para o tabuleiro arrastando.
+e as peças são levadas para o tabuleiro arrastando. No celular (tela de até 460px)
+o tabuleiro ocupa a largura toda e os buckets ficam abaixo dele, uma linha para
+cada jogador.
 
 Ao iniciar, o jogo pergunta:
 
