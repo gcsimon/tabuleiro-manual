@@ -135,7 +135,15 @@ export function renderPiece(value, tone) {
   return svg;
 }
 
-/** The board's lines, one path per entry of `layout.lines`. */
+/** A whole circle, or the arc of one going clockwise from `from` to `to` degrees. */
+function curveEl({ c: [cx, cy], r, from, to }) {
+  if (to - from >= 360) return el('circle', { cx, cy, r, fill: 'none' });
+  const at = (deg) => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)].join(' ');
+  const large = to - from > 180 ? 1 : 0;
+  return el('path', { d: `M ${at(from)} A ${r} ${r} 0 ${large} 1 ${at(to)}`, fill: 'none' });
+}
+
+/** The board's lines, one path per entry of `layout.lines`, and its curves. */
 function boardLines(layout, attrs) {
   const g = el('g', attrs);
   for (const line of layout.lines) {
@@ -144,6 +152,7 @@ function boardLines(layout, attrs) {
       fill: 'none',
     }));
   }
+  for (const curve of layout.curves) g.appendChild(curveEl(curve));
   return g;
 }
 
@@ -158,16 +167,19 @@ export function renderBoardThumb(layout) {
   svg.appendChild(boardLines(layout, {
     stroke: 'currentColor', 'stroke-width': '7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
   }));
-  for (const [cx, cy] of layout.points) {
-    svg.appendChild(el('circle', { cx, cy, r: 13 * layout.pieceScale, fill: 'currentColor' }));
-  }
+  const r = 13 * layout.pieceScale;
+  layout.points.forEach(([cx, cy], idx) => {
+    svg.appendChild(el('circle', layout.marked.includes(idx)
+      ? { cx, cy, r: r * 0.8, fill: 'none', stroke: 'currentColor', 'stroke-width': r * 0.4 }
+      : { cx, cy, r, fill: 'currentColor' }));
+  });
   return svg;
 }
 
 /**
  * Renders the board as an inline SVG element.
  *
- * @param {object} layout  - an entry of BOARDS: its points and lines
+ * @param {object} layout  - an entry of BOARDS: its points, lines, curves and marked points
  * @param {Array}  state   - one entry per point: null, or the piece { fig, tone, home }
  * @param {object} options - { onGrab(idx, event), animateIdx }
  * @returns {SVGSVGElement}
@@ -202,10 +214,12 @@ export function renderBoard(layout, state, options = {}) {
     const figure = FIGURES[piece ? piece.fig : 0];
 
     if (!piece) {
-      // Empty point marker, so the drop spots stay visible.
+      // Empty point marker, so the drop spots stay visible. Marked points are rings.
+      const mark = layout.marked.includes(idx)
+        ? { r: 7, fill: '#0b0d14', stroke: '#2de2e6', 'stroke-width': '2' }
+        : { r: 4.5, fill: '#2de2e6' };
       svg.appendChild(el('circle', {
-        cx, cy, r: 4.5,
-        fill: '#2de2e6',
+        cx, cy, ...mark,
         filter: 'url(#tmGlowLine)',
         class: 'point-empty',
       }));

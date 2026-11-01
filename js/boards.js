@@ -1,245 +1,360 @@
-// Board layouts. Every board lives in a SIZE × SIZE square.
+// Board layouts, one per slide of "tabuleiros Giovani Ext.pptx", in its order.
+// Each builder works in its own units; fit() then scales and centres the board
+// into the SIZE × SIZE square, keeping its proportions.
 //   points: [x, y] of each spot a piece can stand on
 //   lines:  each entry is drawn as a path through those points, in order
+//   curves: circles and arcs, drawn like the lines: { c: [x, y], r, from, to },
+//           angles in degrees, clockwise from the right; 0 to 360 is a whole circle
+//   marked: points drawn apart, as on the original drawing (a centre, or the
+//           rows where pieces start)
 export const SIZE = 300;
 
 const PIECE_R = 22;
 const HIT_R   = 36;
+const MARGIN  = 26;
+const EPS     = 1e-6;
 
-const C = SIZE / 2;
-const SQRT3_2 = Math.sqrt(3) / 2;
+const rad = (deg) => (deg * Math.PI) / 180;
+const polar = (r, deg, [cx, cy] = [0, 0]) => [cx + r * Math.cos(rad(deg)), cy + r * Math.sin(rad(deg))];
 
-/**
- * Maps (col, row) of a cols × rows lattice to board coordinates. The lattice
- * is square (same step both ways) and centred, fitting inside `margin`.
- */
-function lattice(cols, rows, margin) {
-  const step = (SIZE - 2 * margin) / (Math.max(cols, rows) - 1);
-  const x0 = (SIZE - (cols - 1) * step) / 2;
-  const y0 = (SIZE - (rows - 1) * step) / 2;
-  return (c, r) => [x0 + c * step, y0 + r * step];
+/** Every (col, row) of a cols × rows lattice, row by row. */
+function cellsOf(cols, rows) {
+  return Array.from({ length: cols * rows }, (_, i) => [i % cols, Math.floor(i / cols)]);
 }
 
 /**
- * A board made of some cells of a lattice. Lines join neighbouring cells along
- * rows and columns; with `diagonals`, also along the diagonals that run
- * through cells whose col + row is even (the Alquerque pattern).
+ * Points on a square lattice, joined by the lattice lines that run through
+ * them. Each family of lines can be kept whole ('all') or only for its lines
+ * with an even or odd key: the row or column number for straight lines,
+ * col ± row for diagonals ('even' diagonals give the Alquerque pattern).
  */
-function cellBoard({ cols, rows, margin, cells = null, diagonals = false }) {
-  const at = lattice(cols, rows, margin);
-  cells ??= Array.from({ length: cols * rows }, (_, i) => [i % cols, Math.floor(i / cols)]);
-
-  const index = new Map(cells.map(([c, r], i) => [`${c},${r}`, i]));
-  const idx = (c, r) => index.get(`${c},${r}`);
-
-  const dirs = [[1, 0], [0, 1]];
-  if (diagonals) dirs.push([1, 1], [-1, 1]);
+function grid(cols, rows, { cells = cellsOf(cols, rows), straight = 'all', diagonals = null } = {}) {
+  const families = [];
+  if (straight)  families.push([straight, ([, r]) => r, ([c]) => c], [straight, ([c]) => c, ([, r]) => r]);
+  if (diagonals) families.push([diagonals, ([c, r]) => c - r, ([c]) => c], [diagonals, ([c, r]) => c + r, ([c]) => c]);
 
   const lines = [];
-  for (const [dc, dr] of dirs) {
-    const diagonal = dc !== 0 && dr !== 0;
-    for (const [c, r] of cells) {
-      if (diagonal && (c + r) % 2) continue;
-      // Start only where the run starts, then walk along it.
-      if (idx(c - dc, r - dr) !== undefined) continue;
-      const run = [];
-      for (let cc = c, rr = r; idx(cc, rr) !== undefined; cc += dc, rr += dr) run.push(idx(cc, rr));
-      if (run.length > 1) lines.push(run);
+  for (const [which, key, order] of families) {
+    const groups = new Map();
+    cells.forEach((cell, i) => {
+      const k = key(cell);
+      if (which !== 'all' && Math.abs(k % 2) !== (which === 'odd' ? 1 : 0)) return;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(i);
+    });
+    for (const group of groups.values()) {
+      if (group.length > 1) lines.push(group.sort((i, j) => order(cells[i]) - order(cells[j])));
     }
   }
+  return { points: cells, lines };
+}
 
-  return { points: cells.map(([c, r]) => at(c, r)), lines, at, idx };
+/** Where p lies along the segment ab, from 0 to 1, or null if it is off it. */
+function along([px, py], [ax, ay], [bx, by]) {
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  const t = ((px - ax) * dx + (py - ay) * dy) / (len * len);
+  const off = Math.abs((px - ax) * dy - (py - ay) * dx) / len;
+  return off < EPS && t > -EPS && t < 1 + EPS ? t : null;
 }
 
 /**
- * Concentric square rings, as in the morris games. Each ring has 8 points,
- * clockwise from its top-left corner. Side midpoints are always joined across
- * the rings; with `corners`, the corners are too (as in Morabaraba).
+ * A board given by its points and by lines through them. Each line is a list
+ * of corners, and takes in every point lying on the way between them.
  */
-function rings(count, margin, { corners = false } = {}) {
-  const n = 2 * count + 1;
-  const at = lattice(n, n, margin);
-  const points = [];
-  const lines = [];
-  for (let k = 0; k < count; k++) {
-    const lo = k, mid = count, hi = n - 1 - k;
-    const spots = [[lo, lo], [mid, lo], [hi, lo], [hi, mid], [hi, hi], [mid, hi], [lo, hi], [lo, mid]];
-    const first = points.length;
-    for (const [c, r] of spots) points.push(at(c, r));
-    lines.push([0, 1, 2, 3, 4, 5, 6, 7, 0].map((i) => first + i));
-  }
-  // Midpoints are the odd positions of each ring, corners the even ones.
-  const across = corners ? [0, 1, 2, 3, 4, 5, 6, 7] : [1, 3, 5, 7];
-  for (const pos of across) {
-    lines.push(Array.from({ length: count }, (_, k) => k * 8 + pos));
-  }
+function figure(points, paths) {
+  const lines = paths.map((path) => {
+    const run = [];
+    for (let k = 0; k + 1 < path.length; k++) {
+      const onSegment = points
+        .map((p, i) => ({ i, t: along(p, path[k], path[k + 1]) }))
+        .filter(({ t }) => t !== null)
+        .sort((p, q) => p.t - q.t)
+        .map(({ i }) => i);
+      run.push(...(k ? onSegment.slice(1) : onSegment));
+    }
+    return run;
+  });
   return { points, lines };
 }
 
 /** A regular polygon with a centre point, spokes and an outline. */
-function wheel(sides, radius) {
-  const points = [];
-  for (let i = 0; i < sides; i++) {
-    const a = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
-    points.push([C + radius * Math.cos(a), C + radius * Math.sin(a)]);
-  }
-  points.push([C, C]);
-  const centre = sides;
+function wheel(sides) {
+  const points = Array.from({ length: sides }, (_, i) => polar(1, -90 + (360 * i) / sides));
+  points.push([0, 0]);
   const lines = [[...points.keys()].slice(0, sides).concat(0)];
-  for (let i = 0; i < sides / 2; i++) lines.push([i, centre, i + sides / 2]);
+  for (let i = 0; i < sides / 2; i++) lines.push([i, sides, i + sides / 2]);
   return { points, lines };
 }
 
 /**
- * Joins points that line up along given directions. `key` gives, for each
- * point, one value per direction that is shared by the points on the same
- * line, and `order` sorts the points along it.
+ * Concentric rings of one polygon, as in the morris games. Each ring has a
+ * point on every corner and in the middle of every side, clockwise from the
+ * top (from the top-left corner on squares). Side midpoints are joined across
+ * all the rings, corners across the outer `corners` rings. `hole` is the inner
+ * ring's size, in steps between rings; `centre` adds a point in the middle,
+ * joined to the inner ring's 'sides' or 'corners'.
  */
-function axisLines(count, key, order) {
+function rings(sides, count, { corners = 0, hole = 1, centre = null } = {}) {
+  const start = -90 - (sides % 2 ? 0 : 180 / sides);
+  const per = 2 * sides;
+  const points = [];
   const lines = [];
-  const axes = key(0).length;
-  for (let a = 0; a < axes; a++) {
-    const groups = new Map();
-    for (let i = 0; i < count; i++) {
-      const k = key(i)[a];
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(i);
+  for (let k = 0; k < count; k++) {
+    const r = count - 1 - k + hole;
+    for (let i = 0; i < sides; i++) {
+      const [ax, ay] = polar(r, start + (360 * i) / sides);
+      const [bx, by] = polar(r, start + (360 * (i + 1)) / sides);
+      points.push([ax, ay], [(ax + bx) / 2, (ay + by) / 2]);
     }
-    for (const group of groups.values()) {
-      if (group.length > 1) lines.push(group.sort((i, j) => order(i, a) - order(j, a)));
-    }
+    lines.push([...Array(per).keys(), 0].map((pos) => k * per + pos));
   }
-  return lines;
-}
+  if (centre) points.push([0, 0]);
 
-/** A hexagon of hexagonally packed points, `radius` rings around the centre. */
-function hexagon(radius, margin) {
-  const step = (SIZE - 2 * margin) / (2 * radius);
-  const cells = [];
-  for (let r = -radius; r <= radius; r++) {
-    for (let q = -radius; q <= radius; q++) {
-      if (Math.abs(q + r) <= radius) cells.push([q, r]);
-    }
+  // Corners are the even positions of each ring, side midpoints the odd ones.
+  for (let pos = 0; pos < per; pos++) {
+    const isSide = pos % 2 === 1;
+    const reach = isSide ? count : corners;
+    if (reach < 2) continue;
+    const spoke = Array.from({ length: reach }, (_, k) => k * per + pos);
+    if (centre === (isSide ? 'sides' : 'corners') && reach === count) spoke.push(count * per);
+    lines.push(spoke);
   }
-  const points = cells.map(([q, r]) => [C + step * (q + r / 2), C + step * r * SQRT3_2]);
-  // The three directions: constant r, constant q, constant q + r.
-  const lines = axisLines(
-    cells.length,
-    (i) => [cells[i][1], cells[i][0], cells[i][0] + cells[i][1]],
-    (i, a) => (a === 0 ? cells[i][0] : cells[i][1]),
-  );
   return { points, lines };
 }
 
-/** A triangle of points, `size` on each side. */
-function triangle(size, margin) {
-  const step = (SIZE - 2 * margin) / (size - 1);
-  const height = (size - 1) * step * SQRT3_2;
-  const top = (SIZE - height) / 2;
-  const cells = [];
-  for (let row = 0; row < size; row++) {
-    for (let k = 0; k <= row; k++) cells.push([row, k]);
+/**
+ * Concentric circles crossed by diameters, with a point wherever they meet and
+ * one in the centre. The inner circle is a step and a half from the centre.
+ */
+function circles(count, diameters) {
+  const radii = Array.from({ length: count }, (_, k) => count - k + 0.5);
+  const points = [[0, 0]];
+  for (let s = 0; s < 2 * diameters; s++) {
+    for (const r of radii) points.push(polar(r, (180 * s) / diameters));
   }
-  const points = cells.map(([row, k]) => [C + step * (k - row / 2), top + row * step * SQRT3_2]);
-  // Rows, and the two slanted directions: constant k, constant row − k.
-  const lines = axisLines(
-    cells.length,
-    (i) => [cells[i][0], cells[i][1], cells[i][0] - cells[i][1]],
-    (i, a) => (a === 0 ? cells[i][1] : cells[i][0]),
-  );
-  return { points, lines };
+  // Spoke s runs from the outer circle inwards; s + diameters is its other half.
+  const spoke = (s) => radii.map((_, k) => 1 + s * count + k);
+  const lines = Array.from({ length: diameters }, (_, d) => [...spoke(d), 0, ...spoke(d + diameters).reverse()]);
+  return { points, lines, curves: radii.map((r) => ({ c: [0, 0], r })) };
+}
+
+/**
+ * A triangle as tall as it is wide, with a line down the middle and `rows`
+ * evenly spaced lines across it; each of those has a point at both ends and
+ * in the middle.
+ */
+function pyramid(rows) {
+  const apex = [0, 0];
+  const points = [apex];
+  const paths = [[apex, [-0.5, 1]], [apex, [0, 1]], [apex, [0.5, 1]]];
+  for (let k = 1; k <= rows; k++) {
+    const y = k / rows;
+    points.push([-y / 2, y], [0, y], [y / 2, y]);
+    paths.push([[-y / 2, y], [y / 2, y]]);
+  }
+  return figure(points, paths);
+}
+
+/**
+ * Two triangles meeting at a centre point. Each side has a column of three
+ * points at every distance in `columns` (outermost first), on the two
+ * diagonals and on the middle line. `bars` adds lines across the whole board
+ * at the height where the diagonals cross those distances.
+ */
+function bowtie(columns, { bars = [] } = {}) {
+  const SLOPE = 0.8;
+  const out = columns[0];
+  const points = [[0, 0]];
+  const paths = [
+    [[-out, -SLOPE * out], [out, SLOPE * out]],
+    [[-out, SLOPE * out], [out, -SLOPE * out]],
+    [[-out, 0], [out, 0]],
+  ];
+  for (const d of columns) {
+    for (const x of [-d, d]) {
+      points.push([x, -SLOPE * d], [x, 0], [x, SLOPE * d]);
+      paths.push([[x, -SLOPE * d], [x, SLOPE * d]]);
+    }
+  }
+  for (const d of bars) {
+    for (const y of [-SLOPE * d, SLOPE * d]) {
+      points.push([-out, y], [out, y]);
+      paths.push([[-out, y], [out, y]]);
+    }
+  }
+  return { ...figure(points, paths), marked: [0] };
+}
+
+/** A row of diamonds along a line, each sharing a corner with the next. */
+function diamonds(count) {
+  const HALF_HEIGHT = 1.44;
+  const points = Array.from({ length: count + 1 }, (_, i) => [i, 0]);
+  const paths = [[[0, 0], [count, 0]]];
+  for (let i = 0; i < count; i++) {
+    const top = [i + 0.5, -HALF_HEIGHT];
+    const bottom = [i + 0.5, HALF_HEIGHT];
+    points.push(top, bottom);
+    paths.push([[i, 0], top, [i + 1, 0], bottom, [i, 0]]);
+  }
+  return { ...figure(points, paths), marked: [count / 2] };
 }
 
 /** A five-pointed star: its tips and the five points where its lines cross. */
-function star(radius) {
-  const polar = (r, deg) => [C + r * Math.cos((deg * Math.PI) / 180), C + 10 + r * Math.sin((deg * Math.PI) / 180)];
-  const inner = radius * Math.cos((72 * Math.PI) / 180) / Math.cos((36 * Math.PI) / 180);
+function star(tipAngle) {
+  const inner = Math.cos(rad(72)) / Math.cos(rad(36));
+  const tips = Array.from({ length: 5 }, (_, i) => polar(1, tipAngle + 72 * i));
+  const crossings = Array.from({ length: 5 }, (_, i) => polar(inner, tipAngle + 36 + 72 * i));
+  return figure([...tips, ...crossings], tips.map((tip, i) => [tip, tips[(i + 2) % 5]]));
+}
 
-  const tips = Array.from({ length: 5 }, (_, i) => polar(radius, -90 + 72 * i));
-  const crossings = Array.from({ length: 5 }, (_, i) => polar(inner, -90 + 36 + 72 * i));
-  const points = [...tips, ...crossings];
+/**
+ * The dark squares of an n × n checkerboard, as points joined along the
+ * diagonals. `marked` lists rows to draw apart.
+ */
+function checkers(n, { odd = false, marked = [] } = {}) {
+  const cells = cellsOf(n, n).filter(([c, r]) => (c + r) % 2 === (odd ? 1 : 0));
+  const board = grid(n, n, { cells, straight: null, diagonals: 'all' });
+  board.marked = [...cells.keys()].filter((i) => marked.includes(cells[i][1]));
+  return board;
+}
 
-  // Each line goes from tip i to tip i + 2, crossing two inner points.
-  const lines = [];
-  for (let i = 0; i < 5; i++) {
-    const [ax, ay] = tips[i];
-    const [bx, by] = tips[(i + 2) % 5];
-    const len = Math.hypot(bx - ax, by - ay);
-    const onLine = crossings
-      .map((p, j) => ({ j: 5 + j, d: Math.hypot(p[0] - ax, p[1] - ay) }))
-      .filter(({ j }) => {
-        const [px, py] = points[j];
-        return Math.abs((bx - ax) * (py - ay) - (by - ay) * (px - ax)) / len < 0.5;
-      })
-      .sort((p, q) => p.d - q.d)
-      .map(({ j }) => j);
-    lines.push([i, ...onLine, (i + 2) % 5]);
+/** A square grid whose corners are wrapped in loops, three quarters of a circle each. */
+function loops(n) {
+  const m = n - 1;
+  const board = grid(n, n);
+  // Each loop leaves the square at one neighbour of the corner and comes back at the other.
+  board.curves = [[0, 0, 90], [m, 0, 180], [m, m, 270], [0, m, 0]]
+    .map(([x, y, from]) => ({ c: [x, y], r: 1, from, to: from + 270 }));
+  return board;
+}
+
+/**
+ * A circle crossed by two diameters, with a small circle in the middle and a
+ * half circle tucked inside each end of the diameters, its ends on the rim.
+ */
+function arcsCircle() {
+  const R = 1;
+  const r = 0.26;
+  const d = Math.sqrt(R * R - r * r);
+  const points = [[0, 0]];
+  const curves = [{ c: [0, 0], r: R }, { c: [0, 0], r }];
+  for (const a of [0, 90, 180, 270]) {
+    const c = polar(d, a);
+    points.push(polar(R, a), polar(d - r, a), polar(r, a), polar(r, a + 90, c), polar(r, a - 90, c));
+    curves.push({ c, r, from: a + 90, to: a + 270 });
   }
-  return { points, lines };
+  return { ...figure(points, [[[-R, 0], [R, 0]], [[0, -R], [0, R]]]), curves };
 }
 
-/** Jogo da Onça (Adugo): an Alquerque board with a triangular den below it. */
-function onca() {
-  const top = [];
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) top.push([c, r]);
-  const board = cellBoard({ cols: 5, rows: 7, margin: 22, cells: top, diagonals: true });
+/**
+ * A crown seen from above: four lines fan out from the top point, crossed by
+ * four bands, with a fence of three points standing out on each side.
+ */
+function crown() {
+  const top = [0, 0];
+  const rays = [[-0.5, 0.433], [-0.187, 0.609], [0.187, 0.609], [0.5, 0.433]];
+  const on = ([x, y], band) => [(x * band) / 4, (y * band) / 4];
 
-  const { points, lines, at, idx } = board;
-  const den = [[1, 5], [2, 5], [3, 5], [0, 6], [2, 6], [4, 6]];
-  const first = points.length;
-  den.forEach(([c, r]) => points.push(at(c, r)));
-  const d = (c, r) => first + den.findIndex(([dc, dr]) => dc === c && dr === r);
-
-  const apex = idx(2, 4);
-  lines.push(
-    [apex, d(1, 5), d(0, 6)],
-    [apex, d(2, 5), d(2, 6)],
-    [apex, d(3, 5), d(4, 6)],
-    [d(1, 5), d(2, 5), d(3, 5)],
-    [d(0, 6), d(2, 6), d(4, 6)],
-  );
-  return { points, lines };
+  const points = [top];
+  const paths = rays.map((end) => [top, end]);
+  for (let band = 1; band <= 4; band++) {
+    points.push(...rays.map((end) => on(end, band)));
+    paths.push(rays.map((end) => on(end, band)));
+  }
+  for (const side of [-1, 1]) {
+    const outer = rays[side < 0 ? 0 : 3];
+    const fence = [[0.5, 0.09], [0.343, 0.061], [0.186, 0.032]].map(([x, y]) => [side * x, y]);
+    points.push(...fence);
+    paths.push([...fence, on(outer, 1)], [fence[0], on(outer, 3)], [fence[1], on(outer, 2)]);
+  }
+  return figure(points, paths);
 }
 
-/** The cross of Resta Um: a 7 × 7 grid without its 2 × 2 corners. */
-function cross() {
-  const cells = [];
-  for (let r = 0; r < 7; r++) {
-    for (let c = 0; c < 7; c++) {
-      if ((c >= 2 && c <= 4) || (r >= 2 && r <= 4)) cells.push([c, r]);
+/** Scales and centres a board into the SIZE × SIZE square. */
+function fit({ points, lines, curves = [], marked = [] }) {
+  const xs = points.map(([x]) => x);
+  const ys = points.map(([, y]) => y);
+  for (const { c, r, from = 0, to = 360 } of curves) {
+    for (let a = from; a < to + 5; a += 5) {
+      const [x, y] = polar(r, Math.min(a, to), c);
+      xs.push(x);
+      ys.push(y);
     }
   }
-  return cellBoard({ cols: 7, rows: 7, margin: 26, cells });
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const scale = (SIZE - 2 * MARGIN) / Math.max(x1 - x0, y1 - y0);
+  const round = (v) => Math.round(v * 100) / 100;
+  const at = ([x, y]) => [
+    round((SIZE - (x1 - x0) * scale) / 2 + (x - x0) * scale),
+    round((SIZE - (y1 - y0) * scale) / 2 + (y - y0) * scale),
+  ];
+  return {
+    points: points.map(at),
+    lines,
+    curves: curves.map(({ c, r, from = 0, to = 360 }) => ({ c: at(c), r: round(r * scale), from, to })),
+    marked,
+  };
 }
+
+const withCentres = cellsOf(5, 5).filter(([c, r]) => c % 2 === r % 2);
+const noCorners = cellsOf(5, 3).filter(([c, r]) => !((c === 0 || c === 4) && r !== 1));
 
 const LAYOUTS = [
-  { id: 'velha',      name: '3×3 com diagonais',  ...cellBoard({ cols: 3, rows: 3, margin: 45, diagonals: true }) },
-  { id: 'grade3',     name: '3×3 simples',        ...cellBoard({ cols: 3, rows: 3, margin: 45 }) },
-  { id: 'grade4',     name: 'Grade 4×4',          ...cellBoard({ cols: 4, rows: 4, margin: 38 }) },
-  { id: 'shisima',    name: 'Shisima (octógono)', ...wheel(8, 115) },
-  { id: 'alquerque',  name: 'Alquerque 5×5',      ...cellBoard({ cols: 5, rows: 5, margin: 30, diagonals: true }) },
-  { id: 'fanorona',   name: 'Fanorona 9×5',       ...cellBoard({ cols: 9, rows: 5, margin: 20, diagonals: true }) },
-  { id: 'onca',       name: 'Jogo da Onça',       ...onca() },
-  { id: 'trilha6',    name: 'Trilha pequena',     ...rings(2, 32) },
-  { id: 'trilha',     name: 'Trilha',             ...rings(3, 26) },
-  { id: 'morabaraba', name: 'Morabaraba',         ...rings(3, 26, { corners: true }) },
-  { id: 'restaum',    name: 'Resta Um (cruz)',    ...cross() },
-  { id: 'hexagono',   name: 'Hexágono',           ...hexagon(2, 35) },
-  { id: 'triangulo',  name: 'Triângulo',          ...triangle(5, 30) },
-  { id: 'estrela',    name: 'Estrela',            ...star(130) },
+  { id: 'ponghauki',   name: "Pong Hau K'i",            ...figure(
+    [[0, 0], [2, 0], [1, 0.5], [0, 1], [2, 1]],
+    [[[0, 0], [0, 1], [2, 1], [2, 0]], [[0, 0], [2, 1]], [[2, 0], [0, 1]]],
+  ) },
+  { id: 'ponghauki7',  name: "Pong Hau K'i (7 pontos)", ...figure(
+    [[0, 0], [2, 0], [0, 0.7], [1, 0.7], [2, 0.7], [0, 1.4], [2, 1.4]],
+    [[[0, 0], [0, 1.4], [2, 1.4], [2, 0]], [[0, 0.7], [2, 0.7]], [[0, 0], [2, 1.4]], [[2, 0], [0, 1.4]]],
+  ) },
+  { id: 'x3',          name: '3×3 em X',                ...grid(3, 3, { diagonals: 'all' }) },
+  { id: 'velha',       name: '3×3 com diagonais',       ...grid(3, 3, { diagonals: 'even' }) },
+  { id: 'losango3',    name: '3×3 losango',             ...grid(3, 3, { diagonals: 'odd' }) },
+  { id: 'shisima',     name: 'Shisima (octógono)',      ...wheel(8) },
+  { id: 'centros3',    name: '3×3 com centros',         ...grid(5, 5, { cells: withCentres, straight: 'even', diagonals: 'all' }) },
+  { id: 'centros3q',   name: '3×3 com centros ligados', ...grid(5, 5, { cells: withCentres, diagonals: 'all' }) },
+  { id: 'grade3',      name: '3×3 simples',             ...grid(3, 3) },
+  { id: 'trilha6',     name: 'Trilha pequena',          ...rings(4, 2) },
+  { id: 'trilha',      name: 'Trilha',                  ...rings(4, 3) },
+  { id: 'morabaraba',  name: 'Morabaraba',              ...rings(4, 3, { corners: 3 }) },
+  { id: 'trilhacruz',  name: 'Trilha com cruz',         ...rings(4, 3, { corners: 2, centre: 'sides' }) },
+  { id: 'trilhax',     name: 'Trilha com X',            ...rings(4, 3, { corners: 3, centre: 'corners' }) },
+  { id: 'pentagonos',  name: 'Pentágonos',              ...rings(5, 3, { corners: 3, hole: 2 }) },
+  { id: 'tsoro',       name: 'Tsoro Yematatu',          ...pyramid(2) },
+  { id: 'triangulo',   name: 'Triângulo',               ...pyramid(3) },
+  { id: 'coroa',       name: 'Coroa',                   ...crown() },
+  { id: 'grade4',      name: 'Grade 4×4',               ...grid(4, 4) },
+  { id: 'grade5',      name: 'Grade 5×5',               ...grid(5, 5) },
+  { id: 'grade54',     name: 'Grade 5×4',               ...grid(5, 4) },
+  { id: 'x4',          name: '4×4 em X',                ...grid(4, 4, { diagonals: 'all' }) },
+  { id: 'alquerque',   name: 'Alquerque',               ...grid(5, 5, { diagonals: 'even' }), marked: [12] },
+  { id: 'gravata',     name: 'Gravata',                 ...bowtie([7, 4]) },
+  { id: 'gravata2',    name: 'Gravata grande',          ...bowtie([10, 7, 4], { bars: [7] }) },
+  { id: 'losangos',    name: 'Losangos',                ...diamonds(6) },
+  { id: 'circulos2',   name: 'Dois círculos',           ...circles(2, 3), marked: [0] },
+  { id: 'circulos3',   name: 'Três círculos',           ...circles(3, 3) },
+  { id: 'hexagono',    name: 'Hexágono',                ...grid(5, 3, { cells: noCorners, diagonals: 'odd' }) },
+  { id: 'estrela',     name: 'Estrela',                 ...star(180) },
+  { id: 'damas4',      name: 'Damas 4×4',               ...checkers(4, { marked: [1, 2] }) },
+  { id: 'damas6',      name: 'Damas 6×6',               ...checkers(6, { marked: [0, 5] }) },
+  { id: 'damas8',      name: 'Damas 8×8',               ...checkers(8, { odd: true, marked: [3, 4] }) },
+  { id: 'arcos',       name: 'Círculo com arcos',       ...arcsCircle() },
+  { id: 'lacos',       name: 'Grade com laços',         ...loops(4) },
 ];
 
-// Pieces and drop areas shrink on boards whose points sit close together.
-for (const layout of LAYOUTS) {
-  let min = Infinity;
-  layout.points.forEach(([x1, y1], i) => {
-    for (const [x2, y2] of layout.points.slice(i + 1)) min = Math.min(min, Math.hypot(x2 - x1, y2 - y1));
-  });
-  layout.pieceScale = Math.min(1, (min * 0.42) / PIECE_R);
-  layout.hitR = Math.min(HIT_R, min / 2 - 1);
-}
+export const BOARDS = Object.fromEntries(LAYOUTS.map(({ id, name, ...shape }) => {
+  const { points, lines, curves, marked } = fit(shape);
 
-export const BOARDS = Object.fromEntries(LAYOUTS.map(({ id, name, points, lines, pieceScale, hitR }) => [
-  id, { id, name, points, lines, pieceScale, hitR },
-]));
-export const DEFAULT_BOARD = 'velha';
+  // Pieces and drop areas shrink on boards whose points sit close together.
+  let min = Infinity;
+  points.forEach(([x1, y1], i) => {
+    for (const [x2, y2] of points.slice(i + 1)) min = Math.min(min, Math.hypot(x2 - x1, y2 - y1));
+  });
+  const pieceScale = Math.min(1, (min * 0.42) / PIECE_R);
+  const hitR = Math.min(HIT_R, min / 2 - 1);
+
+  return [id, { id, name, points, lines, curves, marked, pieceScale, hitR }];
+}));
+export const DEFAULT_BOARD = LAYOUTS[0].id;
